@@ -1,0 +1,38 @@
+[package]
+name = "sysml-viewer"
+version = "0.0.1"
+publish = false
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+gpui.workspace = true
+gpui-component = { workspace = true, features = [
+  "tree-sitter-languages",
+] }
+gpui-component-assets.workspace = true
+gpui-component-story = { path = "../story" }
+reqwest_client = { path = "../reqwest_client" }
+
+autocorrect = "2.14.2"
+chrono = "0.4"
+color-lsp = "0.2.0"
+fake = { version = "4.4.0", features = ["dummy"] }
+itertools = "0.14.0"
+lsp-types.workspace = true
+rand = "0.9.2"
+regex = "1"
+serde = "1"
+serde_json = "1"
+smol.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tree-sitter-navi = "0.2.2"
+unindent = "0.2.3"
+rust-i18n.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.18" }
+
+[lints]
+workspace = true
