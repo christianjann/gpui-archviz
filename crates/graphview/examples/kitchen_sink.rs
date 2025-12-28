@@ -1,5 +1,5 @@
-use gpug::*;
-use gpui::{div, App, AppContext, Application, WindowOptions, *};
+use graphview::*;
+use gpui::{div, App, Application, WindowOptions, *};
 
 struct LayoutExample {
     graph: Entity<Graph>,

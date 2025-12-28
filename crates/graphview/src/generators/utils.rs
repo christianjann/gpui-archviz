@@ -1,6 +1,6 @@
 use gpui::*;
 
-use crate::node::GpugNode;
+use crate::node::GraphNode;
 
 // Simple xorshift-based PRNG to avoid external dependencies
 pub fn rng_next(seed: &mut u64) -> u64 {
@@ -24,9 +24,9 @@ pub fn rand_f32(seed: &mut u64) -> f32 {
 }
 
 // Generate n nodes with random positions within a region
-pub fn generate_nodes(n: usize) -> Vec<GpugNode> {
+pub fn generate_nodes(n: usize) -> Vec<GraphNode> {
     let mut seed: u64 = 0xCAFEBABEDEADBEEF;
-    let mut nodes: Vec<GpugNode> = Vec::with_capacity(n);
+    let mut nodes: Vec<GraphNode> = Vec::with_capacity(n);
 
     // Scatter in a reasonable viewport box
     let left = 50.0f32;
@@ -39,7 +39,7 @@ pub fn generate_nodes(n: usize) -> Vec<GpugNode> {
         let ry = rand_f32(&mut seed);
         let x = px(left + rx * width);
         let y = px(top + ry * height);
-        nodes.push(GpugNode {
+        nodes.push(GraphNode {
             id: (i as u64) + 1,
             name: format!("Node {}", i + 1),
             x,

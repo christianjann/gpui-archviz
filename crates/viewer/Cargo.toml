@@ -13,7 +13,7 @@ gpui-component = { workspace = true, features = [
 gpui-component-assets.workspace = true
 gpui-component-story = { path = "../story" }
 reqwest_client = { path = "../reqwest_client" }
-gpug = { path = "../gpug" }
+graphview = { path = "../graphview" }
 
 autocorrect = "2.14.2"
 chrono = "0.4"

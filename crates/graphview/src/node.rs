@@ -11,7 +11,7 @@ pub struct NodeChild {
 }
 
 // Simple draggable node with label
-pub struct GpugNode {
+pub struct GraphNode {
     pub id: u64,
     pub name: String,
     pub node_type: String, // "ecu", "bus", "interface", etc.
@@ -32,7 +32,7 @@ pub struct GpugNode {
     pub children: Vec<NodeChild>,
 }
 
-impl GpugNode {
+impl GraphNode {
     /// Estimate node dimensions for hit testing (conservative/larger estimate)
     pub fn estimate_dimensions(&self) -> (f32, f32) {
         let base_width = 120.0f32;
@@ -133,7 +133,7 @@ impl GpugNode {
     }
 }
 
-impl Render for GpugNode {
+impl Render for GraphNode {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let header_height = 28.0f32;
         let port_size = 10.0f32;

@@ -2681,16 +2681,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpug"
-version = "0.1.0"
-dependencies = [
- "dagre-rs",
- "gpui",
- "gpui-component",
- "petgraph",
-]
-
-[[package]]
 name = "gpui"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3060,6 +3050,16 @@ dependencies = [
  "gpui_perf",
  "quote",
  "syn 2.0.111",
+]
+
+[[package]]
+name = "graphview"
+version = "0.1.0"
+dependencies = [
+ "dagre-rs",
+ "gpui",
+ "gpui-component",
+ "petgraph",
 ]
 
 [[package]]
@@ -7081,11 +7081,11 @@ dependencies = [
  "chrono",
  "color-lsp",
  "fake",
- "gpug",
  "gpui",
  "gpui-component",
  "gpui-component-assets",
  "gpui-component-story",
+ "graphview",
  "gtk",
  "itertools 0.14.0",
  "kdl",

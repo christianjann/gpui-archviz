@@ -3,7 +3,7 @@ default-members = ["crates/viewer"]
 members = [
     "crates/viewer",
     "crates/story",
-    "crates/gpug"]
+    "crates/graphview"]
 resolver = "2"
 
 [workspace.package]

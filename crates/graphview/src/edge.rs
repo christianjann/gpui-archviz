@@ -1,10 +1,10 @@
 #[derive(Clone)]
-pub struct GpugEdge {
+pub struct GraphEdge {
     pub source: usize,
     pub target: usize,
 }
 
-impl GpugEdge {
+impl GraphEdge {
     pub fn new(source: usize, target: usize) -> Self {
         Self { source, target }
     }

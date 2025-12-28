@@ -7,7 +7,7 @@ use gpui_component::{
 };
 use gpui_component_assets::Assets;
 use gpui_component_story::Open;
-use gpug::{EdgeRouting, Graph, GpugEdge, GpugNode, NodeChild};
+use graphview::{EdgeRouting, Graph, GraphEdge, GraphNode, NodeChild};
 use tracing::error;
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ pub struct Example {
 
 const EXAMPLE: &str = include_str!("../tests/model/vehicle.kdl");
 
-/// Estimate node size based on name, type, and children (mirrors GpugNode::estimate_dimensions)
+/// Estimate node size based on name, type, and children (mirrors GraphNode::estimate_dimensions)
 fn estimate_node_size(name: &str, node_type: &str, children: &[NodeChild]) -> (f32, f32) {
     let base_width = 120.0f32;
     let header_height = 28.0f32;
@@ -60,7 +60,7 @@ fn estimate_node_size(name: &str, node_type: &str, children: &[NodeChild]) -> (f
 }
 
 /// Parse KDL content and extract nodes (ECUs and buses) with their connections
-fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
+fn parse_kdl_model(content: &str) -> (Vec<GraphNode>, Vec<GraphEdge>) {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     let mut node_name_to_index: HashMap<String, usize> = HashMap::new();
@@ -135,7 +135,7 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
     let gap = 30.0f32;
     let mut bus_x = start_x;
     for info in &bus_nodes {
-        nodes.push(GpugNode {
+        nodes.push(GraphNode {
             id,
             name: info.name.clone(),
             node_type: info.node_type.clone(),
@@ -157,7 +157,7 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
     // Layout ECUs in a row below buses with proper spacing
     let mut ecu_x = start_x;
     for info in &ecu_nodes {
-        nodes.push(GpugNode {
+        nodes.push(GraphNode {
             id,
             name: info.name.clone(),
             node_type: info.node_type.clone(),
@@ -207,7 +207,7 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
                     {
                         // Create edge from ECU to bus
                         if let Some(&bus_index) = node_name_to_index.get(bus_name) {
-                            edges.push(GpugEdge::new(ecu_index, bus_index));
+                            edges.push(GraphEdge::new(ecu_index, bus_index));
                         }
                     }
                 }

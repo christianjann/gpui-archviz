@@ -3,8 +3,8 @@ use gpui::prelude::FluentBuilder;
 use gpui::{canvas, div, Context, IntoElement, ParentElement, Render, Styled, Window};
 use gpui_component::ActiveTheme;
 
-use crate::edge::GpugEdge;
-use crate::node::GpugNode;
+use crate::edge::GraphEdge;
+use crate::node::GraphNode;
 
 /// Edge routing style
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -27,8 +27,8 @@ pub enum LayoutMode {
 }
 
 pub struct Graph {
-    pub nodes: Vec<Entity<GpugNode>>,
-    pub edges: Vec<GpugEdge>,
+    pub nodes: Vec<Entity<GraphNode>>,
+    pub edges: Vec<GraphEdge>,
     pub k: usize,
     pub beta: f32,
     pub sim_tick: u64,
@@ -51,14 +51,14 @@ pub struct Graph {
 impl Graph {
     pub fn new(
         cx: &mut App,
-        nodes: Vec<GpugNode>,
-        edges: Vec<GpugEdge>,
+        nodes: Vec<GraphNode>,
+        edges: Vec<GraphEdge>,
         k: usize,
         beta: f32,
     ) -> Self {
         let zoom = 1.0;
         let pan = point(px(0.0), px(0.0));
-        let mut node_entities: Vec<Entity<GpugNode>> = Vec::with_capacity(nodes.len());
+        let mut node_entities: Vec<Entity<GraphNode>> = Vec::with_capacity(nodes.len());
 
         for mut node in nodes {
             node.zoom = zoom;
@@ -146,9 +146,9 @@ impl Graph {
     }
 
     /// Update the graph with new nodes and edges
-    pub fn update_model(&mut self, nodes: Vec<GpugNode>, edges: Vec<GpugEdge>, cx: &mut Context<Self>) {
+    pub fn update_model(&mut self, nodes: Vec<GraphNode>, edges: Vec<GraphEdge>, cx: &mut Context<Self>) {
         // Create new node entities
-        let mut node_entities: Vec<Entity<GpugNode>> = Vec::with_capacity(nodes.len());
+        let mut node_entities: Vec<Entity<GraphNode>> = Vec::with_capacity(nodes.len());
         for mut node in nodes {
             node.zoom = self.zoom;
             node.pan = self.pan;

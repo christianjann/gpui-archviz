@@ -1,9 +1,9 @@
-use crate::edge::GpugEdge;
+use crate::edge::GraphEdge;
 use crate::generators::utils::rand_f32;
 
 use std::collections::HashSet;
 
-pub fn generate_watts_strogatz_graph(n: usize, k: usize, beta: f32) -> Vec<GpugEdge> {
+pub fn generate_watts_strogatz_graph(n: usize, k: usize, beta: f32) -> Vec<GraphEdge> {
     if n < 2 {
         return Vec::new();
     }
@@ -79,7 +79,7 @@ pub fn generate_watts_strogatz_graph(n: usize, k: usize, beta: f32) -> Vec<GpugE
     for source in 0..n {
         for &target in &adjacency[source] {
             if source < target {
-                edges.push(GpugEdge::new(source, target));
+                edges.push(GraphEdge::new(source, target));
             }
         }
     }

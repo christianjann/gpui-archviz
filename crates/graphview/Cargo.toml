@@ -1,17 +1,15 @@
 [package]
-name = "gpug"
+name = "graphview"
 version = "0.1.0"
-#author = ["jerlendds <oss@osintbuddy.com>"]
 edition.workspace = true
 publish = false
-repository = "https://github.com/jerlendds/gpug"
 readme = "README.md"
 keywords = ["gui", "gpui", "network", "graph"]
 categories = ["gui"]
 
 [lib]
-name = "gpug"
-path = "src/gpug.rs"
+name = "graphview"
+path = "src/lib.rs"
 doctest = false
 
 
