@@ -29,7 +29,7 @@ impl Render for GpugNode {
         let bg_color = cx.theme().secondary;
         let selected_border = cx.theme().ring;
         
-        // Left port (incoming)
+        // Left port (incoming) - positioned as sibling after node so it renders on top
         let left_port = div()
             .absolute()
             .left(px(-port_size / 2.0 * self.zoom))
@@ -40,10 +40,10 @@ impl Render for GpugNode {
             .border_color(border_color)
             .rounded(px(2.0 * self.zoom));
         
-        // Right port (outgoing)
+        // Right port (outgoing) - positioned as sibling after node so it renders on top
         let right_port = div()
             .absolute()
-            .right(px(-port_size / 2.0 * self.zoom))
+            .left(px((base_width - port_size / 2.0) * self.zoom))
             .top(px((base_height - port_size) / 2.0 * self.zoom))
             .size(px(port_size * self.zoom))
             .bg(rgb(0xff8844))
@@ -51,24 +51,33 @@ impl Render for GpugNode {
             .border_color(border_color)
             .rounded(px(2.0 * self.zoom));
         
-        let node = div()
-            .relative()
+        // Node body (rendered first, so ports appear on top)
+        let node_body = div()
+            .absolute()
             .min_w(px(base_width * self.zoom))
             .h(px(base_height * self.zoom))
-            .px(px(12.0 * self.zoom)) // More padding for ports
+            .px(px(12.0 * self.zoom))
             .bg(bg_color)
             .border(px(2.0))
             .border_color(if self.selected { selected_border } else { border_color })
             .rounded(px(4.0 * self.zoom))
             .shadow_sm()
-            .cursor_move()
             .flex()
             .items_center()
             .justify_center()
             .text_color(text_color)
             .text_size(px(12.0 * self.zoom))
+            .child(self.name.clone());
+
+        // Container for node + ports with interaction handlers
+        let node_container = div()
+            .relative()
+            .min_w(px(base_width * self.zoom))
+            .h(px(base_height * self.zoom))
+            .cursor_move()
+            // Node body first, then ports on top
+            .child(node_body)
             .child(left_port)
-            .child(self.name.clone())
             .child(right_port)
             .id(("node", self.id as usize))
             // Start a drag with this node's id as payload; lets listeners filter events
@@ -113,7 +122,7 @@ impl Render for GpugNode {
             .absolute()
             .left(self.pan.x + self.x * self.zoom)
             .top(self.pan.y + self.y * self.zoom)
-            .child(node)
+            .child(node_container)
     }
 }
 
