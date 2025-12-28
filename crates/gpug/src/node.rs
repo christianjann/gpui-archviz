@@ -39,7 +39,7 @@ impl Render for GpugNode {
             .right(px(-port_size / 2.0 * self.zoom))
             .top(px((base_height - port_size) / 2.0 * self.zoom))
             .size(px(port_size * self.zoom))
-            .bg(rgb(0x44ff88))
+            .bg(rgb(0xff8844))
             .border(px(1.0))
             .border_color(rgb(0x333333))
             .rounded(px(2.0 * self.zoom));

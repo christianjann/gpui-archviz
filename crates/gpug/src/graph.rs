@@ -5,6 +5,16 @@ use crate::edge::GpugEdge;
 use crate::generators::watts_strogatz::generate_watts_strogatz_graph;
 use crate::node::GpugNode;
 
+/// Edge routing style
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum EdgeRouting {
+    /// Direct straight line between ports
+    #[default]
+    Straight,
+    /// Manhattan-style orthogonal routing (horizontal and vertical segments only)
+    Manhattan,
+}
+
 pub struct Graph {
     pub nodes: Vec<Entity<GpugNode>>,
     pub edges: Vec<GpugEdge>,
@@ -21,6 +31,8 @@ pub struct Graph {
     pub is_panning: bool,
     pub pan_start: Point<Pixels>,
     pub pan_start_pos: Point<Pixels>,
+    /// Edge routing style
+    pub edge_routing: EdgeRouting,
 }
 
 impl Graph {
@@ -56,6 +68,7 @@ impl Graph {
             is_panning: false,
             pan_start: point(px(0.0), px(0.0)),
             pan_start_pos: point(px(0.0), px(0.0)),
+            edge_routing: EdgeRouting::default(),
         }
     }
 
@@ -151,6 +164,14 @@ impl Graph {
         self.edges = generate_watts_strogatz_graph(node_count, self.k, self.beta);
         cx.notify();
     }
+
+    /// Set the edge routing style
+    pub fn set_edge_routing(&mut self, routing: EdgeRouting, cx: &mut Context<Self>) {
+        if self.edge_routing != routing {
+            self.edge_routing = routing;
+            cx.notify();
+        }
+    }
 }
 
 fn parameter_button<F>(label: &str, cx: &mut Context<Graph>, on_press: F) -> Div
@@ -215,6 +236,7 @@ impl Render for Graph {
         let nodes = self.nodes.clone();
         let edges = self.edges.clone();
         let graph_entity = graph_cx.entity();
+        let edge_routing = self.edge_routing;
         let edges_canvas = canvas(
             |_bounds, _window, _cx| (),
             move |bounds, _state, window, cx| {
@@ -225,6 +247,27 @@ impl Render for Graph {
                 // Node dimensions for edge connections
                 let node_width = 80.0;
                 let node_height = 32.0;
+                
+                // Helper closure to draw a thick line segment
+                let draw_segment = |path: &mut gpui::Path<Pixels>, p1: Point<Pixels>, p2: Point<Pixels>| {
+                    let dir = point(p2.x - p1.x, p2.y - p1.y);
+                    let len = dir.magnitude() as f32;
+                    if len <= 0.0001 {
+                        return;
+                    }
+                    let half_thickness: f32 = thickness as f32;
+                    let normal = point(-dir.y, dir.x) * (half_thickness / len);
+
+                    let p1a = point(p1.x + normal.x, p1.y + normal.y);
+                    let p1b = point(p1.x - normal.x, p1.y - normal.y);
+                    let p2a = point(p2.x + normal.x, p2.y + normal.y);
+                    let p2b = point(p2.x - normal.x, p2.y - normal.y);
+
+                    let st = (point(0., 1.), point(0., 1.), point(0., 1.));
+                    path.push_triangle((p1a, p1b, p2a), st);
+                    path.push_triangle((p2a, p1b, p2b), st);
+                };
+                
                 for edge in &edges {
                     let i = edge.source;
                     let j = edge.target;
@@ -244,22 +287,30 @@ impl Render for Graph {
                     // Offset by bounds.origin so edges are drawn relative to container
                     let p1 = point(offset.x + pan.x + x1 * zoom, offset.y + pan.y + y1 * zoom);
                     let p2 = point(offset.x + pan.x + x2 * zoom, offset.y + pan.y + y2 * zoom);
-                    let dir = point(p2.x - p1.x, p2.y - p1.y);
-                    let len = dir.magnitude() as f32;
-                    if len <= 0.0001 {
-                        continue;
+                    
+                    match edge_routing {
+                        EdgeRouting::Straight => {
+                            // Direct line from p1 to p2
+                            draw_segment(&mut path, p1, p2);
+                        }
+                        EdgeRouting::Manhattan => {
+                            // Manhattan routing: horizontal -> vertical -> horizontal
+                            // Start horizontally from source port, go to midpoint X,
+                            // then vertically to target Y, then horizontally to target port
+                            let mid_x = (p1.x + p2.x) / 2.0;
+                            
+                            // Segment 1: horizontal from p1 to midpoint
+                            let corner1 = point(mid_x, p1.y);
+                            draw_segment(&mut path, p1, corner1);
+                            
+                            // Segment 2: vertical from corner1 to corner2
+                            let corner2 = point(mid_x, p2.y);
+                            draw_segment(&mut path, corner1, corner2);
+                            
+                            // Segment 3: horizontal from corner2 to p2
+                            draw_segment(&mut path, corner2, p2);
+                        }
                     }
-                    let half_thickness: f32 = thickness as f32;
-                    let normal = point(-dir.y, dir.x) * (half_thickness / len);
-
-                    let p1a = point(p1.x + normal.x, p1.y + normal.y);
-                    let p1b = point(p1.x - normal.x, p1.y - normal.y);
-                    let p2a = point(p2.x + normal.x, p2.y + normal.y);
-                    let p2b = point(p2.x - normal.x, p2.y - normal.y);
-
-                    let st = (point(0., 1.), point(0., 1.), point(0., 1.));
-                    path.push_triangle((p1a, p1b, p2a), st);
-                    path.push_triangle((p2a, p1b, p2b), st);
                 }
                 window.paint_path(path, rgb(0x323232));
             },

@@ -1,5 +1,5 @@
 use gpug::*;
-use gpui::{prelude::FluentBuilder as _, div, App, AppContext, Application, WindowOptions, *};
+use gpui::{div, App, AppContext, Application, WindowOptions, *};
 
 struct LayoutExample {
     graph: Entity<Graph>,
@@ -13,7 +13,10 @@ impl LayoutExample {
             let initial_beta = 0.05;
             let nodes = generate_nodes(node_count);
             let edges = generate_watts_strogatz_graph(node_count, initial_k, initial_beta);
-            Graph::new(cx, nodes, edges, initial_k, initial_beta)
+            let mut graph = Graph::new(cx, nodes, edges, initial_k, initial_beta);
+            // Use Manhattan-style edge routing
+            graph.edge_routing = EdgeRouting::Manhattan;
+            graph
         });
 
         Self { graph }

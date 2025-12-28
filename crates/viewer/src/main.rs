@@ -7,7 +7,7 @@ use gpui_component::{
 };
 use gpui_component_assets::Assets;
 use gpui_component_story::Open;
-use gpug::{generate_nodes, generate_watts_strogatz_graph, Graph};
+use gpug::{EdgeRouting, Graph, generate_nodes, generate_watts_strogatz_graph};
 
 pub struct Example {
     input_state: Entity<InputState>,
@@ -38,7 +38,10 @@ impl Example {
             let initial_beta = 0.05;
             let nodes = generate_nodes(node_count);
             let edges = generate_watts_strogatz_graph(node_count, initial_k, initial_beta);
-            Graph::new(cx, nodes, edges, initial_k, initial_beta)
+            let mut graph = Graph::new(cx, nodes, edges, initial_k, initial_beta);
+            // Use Manhattan-style edge routing
+            graph.edge_routing = EdgeRouting::Manhattan;
+            graph
         });
 
         let _subscriptions = vec![cx.subscribe(&input_state, |_, _, _: &InputEvent, _| {})];
