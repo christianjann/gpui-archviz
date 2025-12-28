@@ -16,6 +16,16 @@ pub enum EdgeRouting {
     Manhattan,
 }
 
+/// Layout algorithm mode
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum LayoutMode {
+    /// Force-directed layout simulation
+    #[default]
+    Force,
+    /// Dagre hierarchical layout (Sugiyama method)
+    Dagre,
+}
+
 pub struct Graph {
     pub nodes: Vec<Entity<GpugNode>>,
     pub edges: Vec<GpugEdge>,
@@ -34,6 +44,8 @@ pub struct Graph {
     pub pan_start_pos: Point<Pixels>,
     /// Edge routing style
     pub edge_routing: EdgeRouting,
+    /// Layout algorithm mode
+    pub layout_mode: LayoutMode,
 }
 
 impl Graph {
@@ -70,6 +82,7 @@ impl Graph {
             pan_start: point(px(0.0), px(0.0)),
             pan_start_pos: point(px(0.0), px(0.0)),
             edge_routing: EdgeRouting::default(),
+            layout_mode: LayoutMode::default(),
         }
     }
 
@@ -224,6 +237,112 @@ impl Graph {
                 node.pan = pan;
             });
         }
+        cx.notify();
+    }
+    
+    /// Apply dagre hierarchical layout to nodes
+    pub fn apply_dagre_layout(&mut self, cx: &mut Context<Self>) {
+        use dagre_rs::{DagreLayout, LayoutOptions, RankDir};
+        use petgraph::Graph as PetGraph;
+        
+        let n = self.nodes.len();
+        if n == 0 {
+            return;
+        }
+        
+        // Get node dimensions for spacing calculation
+        let mut max_width = 0.0f32;
+        let mut max_height = 0.0f32;
+        for node_entity in &self.nodes {
+            let (w, h) = cx.read_entity(node_entity, |node, _| (node.width, node.height));
+            max_width = max_width.max(w);
+            max_height = max_height.max(h);
+        }
+        
+        // Build petgraph from our graph structure
+        let mut pg: PetGraph<usize, ()> = PetGraph::new();
+        let mut node_indices = Vec::with_capacity(n);
+        
+        // Add nodes
+        for i in 0..n {
+            node_indices.push(pg.add_node(i));
+        }
+        
+        // Add edges
+        for edge in &self.edges {
+            if edge.source < n && edge.target < n {
+                pg.add_edge(node_indices[edge.source], node_indices[edge.target], ());
+            }
+        }
+        
+        // Configure dagre layout with spacing based on actual node sizes
+        let options = LayoutOptions {
+            rank_dir: RankDir::TopToBottom, // Top to Bottom
+            node_sep: max_width + 30.0,     // Horizontal separation = max node width + gap
+            rank_sep: max_height + 50.0,    // Vertical separation = max node height + gap
+            ..Default::default()
+        };
+        
+        let layout = DagreLayout::with_options(options);
+        let result = layout.compute(&pg);
+        
+        // Check if we got valid positions
+        if result.node_positions.is_empty() {
+            // Dagre returned no positions - fall back to simple grid layout
+            let cols = (n as f32).sqrt().ceil() as usize;
+            let spacing_x = max_width + 50.0;
+            let spacing_y = max_height + 50.0;
+            
+            let zoom = self.zoom;
+            let pan = self.pan;
+            for (i, node_entity) in self.nodes.iter().enumerate() {
+                let col = i % cols;
+                let row = i / cols;
+                let x = 50.0 + col as f32 * spacing_x;
+                let y = 50.0 + row as f32 * spacing_y;
+                cx.update_entity(node_entity, move |node, _| {
+                    node.x = px(x);
+                    node.y = px(y);
+                    node.zoom = zoom;
+                    node.pan = pan;
+                });
+            }
+        } else {
+            // Apply positions from dagre result, scaling up if needed
+            // Dagre positions might be very small, so we need to scale them
+            let mut min_x = f32::MAX;
+            let mut min_y = f32::MAX;
+            let mut positions: Vec<(f32, f32)> = Vec::with_capacity(n);
+            
+            for (i, _node_entity) in self.nodes.iter().enumerate() {
+                if let Some(&(x, y)) = result.node_positions.get(&node_indices[i]) {
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    positions.push((x, y));
+                } else {
+                    positions.push((0.0, 0.0));
+                }
+            }
+            
+            // Offset positions so minimum is at (50, 50)
+            let offset_x = 50.0 - min_x;
+            let offset_y = 50.0 - min_y;
+            
+            let zoom = self.zoom;
+            let pan = self.pan;
+            for (i, node_entity) in self.nodes.iter().enumerate() {
+                let (x, y) = positions[i];
+                let final_x = x + offset_x;
+                let final_y = y + offset_y;
+                cx.update_entity(node_entity, move |node, _| {
+                    node.x = px(final_x);
+                    node.y = px(final_y);
+                    node.zoom = zoom;
+                    node.pan = pan;
+                });
+            }
+        }
+        
         cx.notify();
     }
 }
@@ -478,6 +597,7 @@ impl Render for Graph {
         
         // Zoom controls panel
         let zoom_percent = (self.zoom * 100.0) as i32;
+        let layout_mode = self.layout_mode;
         let controls_panel = {
             let zoom_out = parameter_button("-", text_color, border_color, graph_cx, |this, cx| {
                 this.set_zoom(this.zoom - 0.1, cx);
@@ -501,6 +621,37 @@ impl Render for Graph {
                         this.fit_to_content(cx);
                     }),
                 );
+            
+            // Layout mode toggle button
+            let layout_label = match layout_mode {
+                LayoutMode::Force => "Force",
+                LayoutMode::Dagre => "Dagre",
+            };
+            let layout_button = div()
+                .px(px(8.0))
+                .py(px(4.0))
+                .text_color(text_color)
+                .border(px(1.0))
+                .border_color(border_color)
+                .rounded(px(4.0))
+                .cursor_pointer()
+                .hover(|this| this.bg(bg_color))
+                .child(format!("Layout: {}", layout_label))
+                .on_mouse_down(
+                    gpui::MouseButton::Left,
+                    graph_cx.listener(|this, _e: &gpui::MouseDownEvent, _w, cx| {
+                        this.layout_mode = match this.layout_mode {
+                            LayoutMode::Force => {
+                                // Apply dagre layout immediately when switching to it
+                                this.apply_dagre_layout(cx);
+                                this.playing = false; // Stop force simulation
+                                LayoutMode::Dagre
+                            },
+                            LayoutMode::Dagre => LayoutMode::Force,
+                        };
+                        cx.notify();
+                    }),
+                );
 
             div()
                 .absolute()
@@ -520,9 +671,11 @@ impl Render for Graph {
                 .child(zoom_in)
                 .child(div().w(px(8.0))) // spacer
                 .child(fit_button)
+                .child(div().w(px(8.0))) // spacer
+                .child(layout_button)
         };
 
-        // Simulation canvas: runs a physics step per frame when playing
+        // Simulation canvas: runs a physics step per frame when playing in Force mode
         let graph_entity = graph_cx.entity();
         let graph_handle = graph_entity.clone();
         let nodes_for_sim = self.nodes.clone();
@@ -530,8 +683,9 @@ impl Render for Graph {
         let sim_canvas = canvas(
             move |_bounds, _window, _cx| (),
             move |_bounds, _state, window, cx| {
-                let playing = cx.read_entity(&graph_handle, |g: &Graph, _| g.playing);
-                if !playing {
+                let (playing, layout_mode) = cx.read_entity(&graph_handle, |g: &Graph, _| (g.playing, g.layout_mode));
+                // Only run force simulation when playing AND in Force mode
+                if !playing || layout_mode != LayoutMode::Force {
                     return;
                 }
                 let n = nodes_for_sim.len();
@@ -871,8 +1025,14 @@ impl Render for Graph {
             }))
             .child(graph_canvas)
             .child(controls_panel)
-            .child(
-                // Play button for auto-layout simulation
+            .child({
+                // Play button - runs force simulation in Force mode, or applies dagre layout once in Dagre mode
+                let is_playing_force = self.playing && self.layout_mode == LayoutMode::Force;
+                let button_text_color = if is_playing_force {
+                    gpui::white() // White text on green background
+                } else {
+                    text_color
+                };
                 div()
                     .absolute()
                     .top(px(8.0))
@@ -880,24 +1040,41 @@ impl Render for Graph {
                     .size(px(28.0))
                     .rounded_full()
                     .cursor_pointer()
-                    .when(self.playing, |this| this.bg(rgb(0x4CAF50)))
+                    .when(is_playing_force, |this| this.bg(rgb(0x4CAF50)))
                     .border(px(1.0))
                     .border_color(border_color)
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_color(text_color)
                     .text_size(px(12.0))
-                    .child(if self.playing { "⏸" } else { "▶" })
+                    .child(
+                        div()
+                            .text_color(button_text_color)
+                            .child(if self.layout_mode == LayoutMode::Dagre {
+                                "⟳" // Refresh/relayout icon for dagre
+                            } else if self.playing {
+                                "||" // Pause symbol (using ASCII for better visibility)
+                            } else {
+                                "▶"
+                            })
+                    )
                     .on_mouse_down(
                         gpui::MouseButton::Left,
                         graph_cx.listener({
                             move |this, _e: &gpui::MouseDownEvent, _w, cx| {
-                                this.playing = !this.playing;
+                                match this.layout_mode {
+                                    LayoutMode::Force => {
+                                        this.playing = !this.playing;
+                                    }
+                                    LayoutMode::Dagre => {
+                                        // In Dagre mode, clicking applies the layout once
+                                        this.apply_dagre_layout(cx);
+                                    }
+                                }
                                 cx.notify();
                             }
                         }),
                     )
-            )
+            })
     }
 }

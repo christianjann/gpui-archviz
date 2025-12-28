@@ -20,8 +20,10 @@ doctest = false
 #path = "src/main.rs"
 
 [dependencies]
+dagre-rs.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
+petgraph = "0.8.3"
 
 [[example]]
 name = "kitchen_sink"

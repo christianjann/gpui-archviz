@@ -2,6 +2,7 @@ pub use crate::edge::GpugEdge;
 pub use crate::generators::utils::generate_nodes;
 pub use crate::generators::watts_strogatz::generate_watts_strogatz_graph;
 pub use crate::graph::EdgeRouting;
+pub use crate::graph::LayoutMode;
 pub use crate::graph::Graph;
 pub use crate::node::GpugNode;
 pub use crate::node::NodeChild;

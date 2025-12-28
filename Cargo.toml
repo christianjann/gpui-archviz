@@ -38,6 +38,7 @@ smallvec = "1"
 smol = "2"
 tracing = "0.1.41"
 kdl = "6.5.0"
+dagre-rs = "0.1.0"
 
 [workspace.dependencies.windows]
 features = ["Wdk", "Wdk_System", "Wdk_System_SystemServices"]
