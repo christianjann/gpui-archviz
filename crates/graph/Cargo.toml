@@ -1,9 +1,0 @@
-[package]
-name = "graph"
-version = "0.0.1"
-publish = false
-edition.workspace = true
-
-[dependencies]
-gpui.workspace = true
-gpui-d3rs = { git = "https://github.com/pierreaubert/sotf.git"}

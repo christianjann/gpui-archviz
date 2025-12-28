@@ -3,7 +3,6 @@ default-members = ["crates/viewer"]
 members = [
     "crates/viewer",
     "crates/story",
-    "crates/graph",
     "crates/gpug"]
 resolver = "2"
 
