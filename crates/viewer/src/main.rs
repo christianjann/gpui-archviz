@@ -156,7 +156,17 @@ impl Example {
             graph
         });
 
-        let _subscriptions = vec![cx.subscribe(&input_state, |_, _, _: &InputEvent, _| {})];
+        // Subscribe to input changes and update the graph
+        let graph_for_sub = graph.clone();
+        let _subscriptions = vec![cx.subscribe(&input_state, move |_this, input, event: &InputEvent, cx| {
+            if let InputEvent::Change = event {
+                let content = input.read(cx).value();
+                let (nodes, edges) = parse_kdl_model(&content);
+                graph_for_sub.update(cx, |graph, cx| {
+                    graph.update_model(nodes, edges, cx);
+                });
+            }
+        })];
 
         Self {
             input_state,

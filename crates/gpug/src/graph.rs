@@ -174,6 +174,23 @@ impl Graph {
             cx.notify();
         }
     }
+
+    /// Update the graph with new nodes and edges
+    pub fn update_model(&mut self, nodes: Vec<GpugNode>, edges: Vec<GpugEdge>, cx: &mut Context<Self>) {
+        // Create new node entities
+        let mut node_entities: Vec<Entity<GpugNode>> = Vec::with_capacity(nodes.len());
+        for mut node in nodes {
+            node.zoom = self.zoom;
+            node.pan = self.pan;
+            node.container_offset = self.container_offset;
+            node_entities.push(cx.new(|_| node));
+        }
+        
+        self.nodes = node_entities;
+        self.edges = edges;
+        self.needs_layout = true;
+        cx.notify();
+    }
 }
 
 fn parameter_button<F>(label: &str, text_color: Hsla, border_color: Hsla, cx: &mut Context<Graph>, on_press: F) -> Div
