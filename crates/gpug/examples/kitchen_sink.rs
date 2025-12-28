@@ -8,7 +8,7 @@ struct LayoutExample {
 impl LayoutExample {
     fn new(cx: &mut Context<Self>) -> Self {
         let graph = cx.new(|cx| {
-            let node_count = 250;
+            let node_count = 25;
             let initial_k = 3;
             let initial_beta = 0.05;
             let nodes = generate_nodes(node_count);
