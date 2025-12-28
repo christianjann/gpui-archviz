@@ -33,51 +33,49 @@ pub struct GraphNode {
 }
 
 impl GraphNode {
-    /// Estimate node dimensions for hit testing (conservative/larger estimate)
-    pub fn estimate_dimensions(&self) -> (f32, f32) {
+    /// Estimate node size based on name, type, and children (static version for pre-creation estimation)
+    pub fn estimate_node_size(name: &str, node_type: &str, children: &[NodeChild]) -> (f32, f32) {
         let base_width = 120.0f32;
         let header_height = 28.0f32;
         let char_width = 7.2f32;
         let padding = 24.0f32;
         
         // Width from name and type
-        let name_width = self.name.len() as f32 * char_width + padding;
-        let type_width = self.node_type.len() as f32 * 6.0 + 40.0;
+        let name_width = name.len() as f32 * char_width + padding;
+        let type_width = node_type.len() as f32 * 6.0 + 40.0;
         let mut content_width = name_width.max(type_width).max(base_width);
         
-        if self.children.is_empty() {
+        if children.is_empty() {
             return (content_width, header_height);
         }
         
         // Estimate height: header + partitions stacked vertically
-        // Be generous with estimates to ensure hit testing works
         let mut total_child_height = 0.0f32;
         let mut max_partition_width = 0.0f32;
         
-        for child in &self.children {
-            // Each swc is approximately 45px tall (label + name + padding + margin)
+        for child in children {
             let swc_count = child.children.len().max(1);
-            // Partition header ~35px + swcs (stacked or wrapped)
-            // Assume worst case: all swcs on separate rows
             let partition_height = 40.0 + (swc_count as f32 * 45.0);
-            total_child_height += partition_height + 8.0; // gap between partitions
+            total_child_height += partition_height + 8.0;
             
-            // Estimate partition width based on longest swc name
             let partition_name_width = child.name.len() as f32 * 6.0 + 50.0;
             let max_swc_width = child.children.iter()
                 .map(|s| s.name.len() as f32 * 6.0 + 50.0)
                 .max_by(|a, b| a.partial_cmp(b).unwrap())
                 .unwrap_or(60.0);
-            // Partition needs to fit at least 2 swcs side by side or 1 wide one
             let partition_width = partition_name_width.max(max_swc_width * 2.0 + 20.0);
             max_partition_width = max_partition_width.max(partition_width);
         }
         
-        // Node width = max of header width and partition widths + padding
         content_width = content_width.max(max_partition_width + 16.0);
         let node_height = header_height + total_child_height + 12.0;
         
         (content_width, node_height)
+    }
+
+    /// Estimate node dimensions for hit testing (conservative/larger estimate)
+    pub fn estimate_dimensions(&self) -> (f32, f32) {
+        Self::estimate_node_size(&self.name, &self.node_type, &self.children)
     }
     
     /// Render a child element (partition or swc) recursively
