@@ -1,9 +1,10 @@
 use gpui::div;
 use gpui::*;
 
-// Simple draggable node
+// Simple draggable node with label
 pub struct GpugNode {
     pub id: u64,
+    pub name: String,
     pub x: Pixels,
     pub y: Pixels,
     // Offset from the node's origin to the cursor at drag start
@@ -17,11 +18,25 @@ pub struct GpugNode {
 
 impl Render for GpugNode {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let base_width = 80.0;
+        let base_height = 32.0;
+        
         let node = div()
-            .size(px(16.0 * self.zoom))
-            .rounded_full()
-            .bg(rgb(0x000000))
+            .min_w(px(base_width * self.zoom))
+            .h(px(base_height * self.zoom))
+            .px(px(8.0 * self.zoom))
+            .bg(rgb(0xffffff))
+            .border(px(2.0))
+            .border_color(if self.selected { rgb(0x1E90FF) } else { rgb(0x333333) })
+            .rounded(px(4.0 * self.zoom))
+            .shadow_sm()
             .cursor_move()
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(rgb(0x000000))
+            .text_size(px(12.0 * self.zoom))
+            .child(self.name.clone())
             .id(("node", self.id as usize))
             // Start a drag with this node's id as payload; lets listeners filter events
             .on_drag(self.id, |_id: &u64, _offset, _window, cx| {
@@ -60,26 +75,12 @@ impl Render for GpugNode {
                 }
             }));
 
-        if self.selected {
-            // Wrap the dot with a positioned container that provides
-            // a fixed 10px gap between the border and the black node
-            div()
-                .absolute()
-                .left(self.pan.x + self.x * self.zoom - px(10.0))
-                .top(self.pan.y + self.y * self.zoom - px(10.0))
-                .p(px(8.0))
-                .border(px(4.0))
-                .rounded_full()
-                .border_color(rgb(0x1E90FF))
-                .child(node)
-        } else {
-            // Unselected: position with a wrapper so both branches return the same type
-            div()
-                .absolute()
-                .left(self.pan.x + self.x * self.zoom)
-                .top(self.pan.y + self.y * self.zoom)
-                .child(node)
-        }
+        // Position the node with absolute positioning
+        div()
+            .absolute()
+            .left(self.pan.x + self.x * self.zoom)
+            .top(self.pan.y + self.y * self.zoom)
+            .child(node)
     }
 }
 

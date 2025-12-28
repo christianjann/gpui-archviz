@@ -221,15 +221,19 @@ impl Render for Graph {
                 // Use bounds.origin to offset painting to the container's position
                 let offset = bounds.origin;
                 let mut path = gpui::Path::new(offset);
-                let thickness = (0.5f32 * zoom).max(0.5);
+                let thickness = (1.0f32 * zoom).max(1.0);
+                // Node dimensions for centering edges
+                let node_width = 80.0;
+                let node_height = 32.0;
                 for edge in &edges {
                     let i = edge.source;
                     let j = edge.target;
                     if i >= nodes.len() || j >= nodes.len() {
                         continue;
                     }
-                    let (x1, y1) = cx.read_entity(&nodes[i], |n, _| (n.x + px(8.0), n.y + px(8.0)));
-                    let (x2, y2) = cx.read_entity(&nodes[j], |n, _| (n.x + px(8.0), n.y + px(8.0)));
+                    // Connect to center of rectangular nodes
+                    let (x1, y1) = cx.read_entity(&nodes[i], |n, _| (n.x + px(node_width / 2.0), n.y + px(node_height / 2.0)));
+                    let (x2, y2) = cx.read_entity(&nodes[j], |n, _| (n.x + px(node_width / 2.0), n.y + px(node_height / 2.0)));
 
                     // Offset by bounds.origin so edges are drawn relative to container
                     let p1 = point(offset.x + pan.x + x1 * zoom, offset.y + pan.y + y1 * zoom);
@@ -494,15 +498,17 @@ impl Render for Graph {
                         e.position.y - this.container_offset.y,
                     );
                     let mut hit_index: Option<usize> = None;
+                    // Node dimensions for hit testing
+                    let node_width = px(80.0) * this.zoom;
+                    let node_height = px(32.0) * this.zoom;
                     for (i, n) in this.nodes.iter().enumerate() {
                         let (nx, ny) = cx.read_entity(n, |node, _| (node.x, node.y));
                         let left = this.pan.x + nx * this.zoom;
                         let top = this.pan.y + ny * this.zoom;
-                        let size = px(16.0) * this.zoom;
                         if cursor.x >= left
-                            && cursor.x <= left + size
+                            && cursor.x <= left + node_width
                             && cursor.y >= top
-                            && cursor.y <= top + size
+                            && cursor.y <= top + node_height
                         {
                             hit_index = Some(i);
                             break;

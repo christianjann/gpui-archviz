@@ -41,6 +41,7 @@ pub fn generate_nodes(n: usize) -> Vec<GpugNode> {
         let y = px(top + ry * height);
         nodes.push(GpugNode {
             id: (i as u64) + 1,
+            name: format!("Node {}", i + 1),
             x,
             y,
             drag_offset: None,
