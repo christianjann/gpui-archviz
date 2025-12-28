@@ -151,20 +151,13 @@ impl Render for GpugNode {
             _ => (rgb(0x4a4a4a), rgb(0xaaaaaa)),
         };
         
-        // Estimate dimensions for hit testing (actual layout is handled by flex)
-        let (estimated_width, estimated_height) = self.estimate_dimensions();
+        // Calculate node dimensions - use estimate_dimensions for consistency
+        let (node_width, node_height) = self.estimate_dimensions();
         let has_children = !self.children.is_empty();
         
         // Update stored dimensions for edge routing and hit testing
-        self.width = estimated_width;
-        self.height = estimated_height;
-        
-        // Base width for the node (minimum)
-        let base_width = 120.0f32;
-        let char_width = 7.2f32;
-        let padding = 24.0f32;
-        let name_width = self.name.len() as f32 * char_width + padding;
-        let min_width = name_width.max(base_width);
+        self.width = node_width;
+        self.height = node_height;
         
         // Header with type label and name
         let header = div()
@@ -234,10 +227,10 @@ impl Render for GpugNode {
             .border_color(border_color)
             .rounded(px(2.0 * self.zoom));
         
-        // Node body - use flex layout to naturally size to content
+        // Node body - use fixed width for consistent edge routing
         let mut node_body = div()
             .id(("node", self.id as usize))
-            .min_w(px(min_width * self.zoom))
+            .w(px(node_width * self.zoom))
             .bg(bg_color)
             .border(px(2.0))
             .border_color(if self.selected { selected_border } else { border_color })

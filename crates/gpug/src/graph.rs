@@ -4,7 +4,6 @@ use gpui::{canvas, div, Context, IntoElement, ParentElement, Render, Styled, Win
 use gpui_component::ActiveTheme;
 
 use crate::edge::GpugEdge;
-use crate::generators::watts_strogatz::generate_watts_strogatz_graph;
 use crate::node::GpugNode;
 
 /// Edge routing style
@@ -125,48 +124,6 @@ impl Graph {
         }
     }
 
-    fn max_k(&self) -> usize {
-        self.nodes.len().saturating_sub(1).saturating_div(2).max(1)
-    }
-
-    fn adjust_k(&mut self, delta: isize, cx: &mut Context<Self>) {
-        let node_count = self.nodes.len();
-        if node_count < 2 {
-            return;
-        }
-        let max_k = self.max_k() as isize;
-        let mut new_k = self.k as isize + delta;
-        if max_k < 1 {
-            return;
-        }
-        if new_k < 1 {
-            new_k = 1;
-        }
-        if new_k > max_k {
-            new_k = max_k;
-        }
-        if new_k as usize == self.k {
-            return;
-        }
-        self.k = new_k as usize;
-        self.edges = generate_watts_strogatz_graph(node_count, self.k, self.beta);
-        cx.notify();
-    }
-
-    fn adjust_beta(&mut self, delta: f32, cx: &mut Context<Self>) {
-        let new_beta = (self.beta + delta).clamp(0.0, 1.0);
-        if (new_beta - self.beta).abs() < 1e-4 {
-            return;
-        }
-        self.beta = new_beta;
-        let node_count = self.nodes.len();
-        if node_count < 2 {
-            return;
-        }
-        self.edges = generate_watts_strogatz_graph(node_count, self.k, self.beta);
-        cx.notify();
-    }
-
     /// Set the edge routing style
     pub fn set_edge_routing(&mut self, routing: EdgeRouting, cx: &mut Context<Self>) {
         if self.edge_routing != routing {
@@ -189,6 +146,84 @@ impl Graph {
         self.nodes = node_entities;
         self.edges = edges;
         self.needs_layout = true;
+        cx.notify();
+    }
+    
+    /// Set zoom level and update all nodes
+    pub fn set_zoom(&mut self, new_zoom: f32, cx: &mut Context<Self>) {
+        let new_zoom = new_zoom.clamp(0.1, 3.0);
+        if (new_zoom - self.zoom).abs() < 0.001 {
+            return;
+        }
+        self.zoom = new_zoom;
+        let zoom = self.zoom;
+        for n in &self.nodes {
+            cx.update_entity(n, move |node, _| {
+                node.zoom = zoom;
+            });
+        }
+        cx.notify();
+    }
+    
+    /// Fit all nodes into the visible area
+    pub fn fit_to_content(&mut self, cx: &mut Context<Self>) {
+        if self.nodes.is_empty() || self.container_size.width <= px(0.0) {
+            return;
+        }
+        
+        // Find bounding box of all nodes
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+        
+        for n in &self.nodes {
+            let (x, y, w, h) = cx.read_entity(n, |node, _| {
+                let (w, h) = node.estimate_dimensions();
+                ((node.x / px(1.0)) as f32, (node.y / px(1.0)) as f32, w, h)
+            });
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x + w);
+            max_y = max_y.max(y + h);
+        }
+        
+        let content_width = max_x - min_x;
+        let content_height = max_y - min_y;
+        
+        if content_width <= 0.0 || content_height <= 0.0 {
+            return;
+        }
+        
+        // Calculate zoom to fit with some padding
+        let padding = 40.0;
+        let available_width = (self.container_size.width / px(1.0)) as f32 - padding * 2.0;
+        let available_height = (self.container_size.height / px(1.0)) as f32 - padding * 2.0;
+        
+        let zoom_x = available_width / content_width;
+        let zoom_y = available_height / content_height;
+        let new_zoom = zoom_x.min(zoom_y).clamp(0.1, 2.0);
+        
+        // Center the content
+        let center_x = (min_x + max_x) / 2.0;
+        let center_y = (min_y + max_y) / 2.0;
+        let container_width = (self.container_size.width / px(1.0)) as f32;
+        let container_height = (self.container_size.height / px(1.0)) as f32;
+        let pan_x = container_width / 2.0 - center_x * new_zoom;
+        let pan_y = container_height / 2.0 - center_y * new_zoom;
+        
+        self.zoom = new_zoom;
+        self.pan = point(px(pan_x), px(pan_y));
+        
+        // Update all nodes
+        let zoom = self.zoom;
+        let pan = self.pan;
+        for n in &self.nodes {
+            cx.update_entity(n, move |node, _| {
+                node.zoom = zoom;
+                node.pan = pan;
+            });
+        }
         cx.notify();
     }
 }
@@ -260,8 +295,11 @@ impl Render for Graph {
                 // Use bounds.origin to offset painting to the container's position
                 let offset = bounds.origin;
                 let thickness = (1.0f32 * zoom).max(1.0);
-                // Node height for edge connections (width is per-node)
-                let node_height = 32.0;
+                
+                // Port positioning constants (must match node.rs)
+                let header_height = 28.0f32;
+                // Port vertical center is at header_height / 2 from node top
+                let port_y_offset = header_height / 2.0;
                 
                 // Port colors for highlighted edges
                 let source_color = rgb(0xff8844); // Orange (outgoing port)
@@ -311,14 +349,17 @@ impl Render for Graph {
                         continue;
                     }
                     // Connect from source's right port to target's left port
+                    // Right port center: node.x + node.width (port extends past node edge)
+                    // Left port center: node.x (port extends before node edge)
+                    // Vertical: port_y_offset from top of node
                     let (x1, y1, source_selected) = cx.read_entity(&nodes[i], |n, _| (
-                        n.x + px(n.width), // Right edge of source node (using actual width)
-                        n.y + px(node_height / 2.0), // Vertically centered
+                        n.x + px(n.width), // Right port center x
+                        n.y + px(port_y_offset), // Port vertical center
                         n.selected
                     ));
                     let (x2, y2, target_selected) = cx.read_entity(&nodes[j], |n, _| (
-                        n.x, // Left edge of target node
-                        n.y + px(node_height / 2.0), // Vertically centered
+                        n.x, // Left port center x
+                        n.y + px(port_y_offset), // Port vertical center
                         n.selected
                     ));
 
@@ -414,56 +455,55 @@ impl Render for Graph {
             .child(edges_canvas)
             .children(self.nodes.iter().cloned());
 
-        let max_k = self.max_k();
         // Get theme colors for controls
         let text_color = graph_cx.theme().foreground;
         let border_color = graph_cx.theme().border;
+        let bg_color = graph_cx.theme().secondary;
         
+        // Zoom controls panel
+        let zoom_percent = (self.zoom * 100.0) as i32;
         let controls_panel = {
-            let decrease_k = parameter_button("-", text_color, border_color, graph_cx, |this, cx| {
-                this.adjust_k(-1, cx);
+            let zoom_out = parameter_button("-", text_color, border_color, graph_cx, |this, cx| {
+                this.set_zoom(this.zoom - 0.1, cx);
             });
-            let increase_k = parameter_button("+", text_color, border_color, graph_cx, |this, cx| {
-                this.adjust_k(1, cx);
+            let zoom_in = parameter_button("+", text_color, border_color, graph_cx, |this, cx| {
+                this.set_zoom(this.zoom + 0.1, cx);
             });
-            let beta_step = 0.05f32;
-            let decrease_beta = parameter_button("-", text_color, border_color, graph_cx, move |this, cx| {
-                this.adjust_beta(-beta_step, cx);
-            });
-            let increase_beta = parameter_button("+", text_color, border_color, graph_cx, move |this, cx| {
-                this.adjust_beta(beta_step, cx);
-            });
+            let fit_button = div()
+                .px(px(8.0))
+                .py(px(4.0))
+                .text_color(text_color)
+                .border(px(1.0))
+                .border_color(border_color)
+                .rounded(px(4.0))
+                .cursor_pointer()
+                .hover(|this| this.bg(bg_color))
+                .child("Fit")
+                .on_mouse_down(
+                    gpui::MouseButton::Left,
+                    graph_cx.listener(|this, _e: &gpui::MouseDownEvent, _w, cx| {
+                        this.fit_to_content(cx);
+                    }),
+                );
 
             div()
                 .absolute()
                 .top(px(8.0))
                 .left(px(8.0))
                 .text_color(text_color)
+                .bg(graph_cx.theme().background.opacity(0.9))
                 .border(px(1.0))
                 .border_color(border_color)
                 .rounded(px(6.0))
                 .p(px(8.0))
                 .flex()
-                .flex_col()
+                .items_center()
                 .gap_2()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(format!("k: {} / {}", self.k, max_k))
-                        .child(decrease_k)
-                        .child(increase_k),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(format!("beta: {:.2}", self.beta))
-                        .child(decrease_beta)
-                        .child(increase_beta),
-                )
+                .child(zoom_out)
+                .child(format!("{}%", zoom_percent))
+                .child(zoom_in)
+                .child(div().w(px(8.0))) // spacer
+                .child(fit_button)
         };
 
         // Simulation canvas: runs a physics step per frame when playing
@@ -611,25 +651,6 @@ impl Render for Graph {
         .absolute()
         .size_full();
 
-        let play_button = div()
-            .absolute()
-            .top(px(8.0))
-            .right(px(8.0))
-            .size(px(28.0))
-            .rounded_full()
-            .when(self.playing, |this| this.bg(rgb(0x4CAF50)))
-            .border(px(1.0))
-            .border_color(border_color)
-            .on_mouse_down(
-                gpui::MouseButton::Left,
-                graph_cx.listener({
-                    move |this, _e: &gpui::MouseDownEvent, _w, cx| {
-                        this.playing = !this.playing;
-                        cx.notify();
-                    }
-                }),
-            );
-
         div()
             .size_full()
             // Background is transparent so parent can set the themed background
@@ -772,6 +793,33 @@ impl Render for Graph {
             }))
             .child(graph_canvas)
             .child(controls_panel)
-            .child(play_button)
+            .child(
+                // Play button for auto-layout simulation
+                div()
+                    .absolute()
+                    .top(px(8.0))
+                    .right(px(8.0))
+                    .size(px(28.0))
+                    .rounded_full()
+                    .cursor_pointer()
+                    .when(self.playing, |this| this.bg(rgb(0x4CAF50)))
+                    .border(px(1.0))
+                    .border_color(border_color)
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_color(text_color)
+                    .text_size(px(12.0))
+                    .child(if self.playing { "⏸" } else { "▶" })
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        graph_cx.listener({
+                            move |this, _e: &gpui::MouseDownEvent, _w, cx| {
+                                this.playing = !this.playing;
+                                cx.notify();
+                            }
+                        }),
+                    )
+            )
     }
 }
