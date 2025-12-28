@@ -222,7 +222,7 @@ impl Render for Graph {
                 let offset = bounds.origin;
                 let mut path = gpui::Path::new(offset);
                 let thickness = (1.0f32 * zoom).max(1.0);
-                // Node dimensions for centering edges
+                // Node dimensions for edge connections
                 let node_width = 80.0;
                 let node_height = 32.0;
                 for edge in &edges {
@@ -231,9 +231,15 @@ impl Render for Graph {
                     if i >= nodes.len() || j >= nodes.len() {
                         continue;
                     }
-                    // Connect to center of rectangular nodes
-                    let (x1, y1) = cx.read_entity(&nodes[i], |n, _| (n.x + px(node_width / 2.0), n.y + px(node_height / 2.0)));
-                    let (x2, y2) = cx.read_entity(&nodes[j], |n, _| (n.x + px(node_width / 2.0), n.y + px(node_height / 2.0)));
+                    // Connect from source's right port to target's left port
+                    let (x1, y1) = cx.read_entity(&nodes[i], |n, _| (
+                        n.x + px(node_width), // Right edge of source node
+                        n.y + px(node_height / 2.0) // Vertically centered
+                    ));
+                    let (x2, y2) = cx.read_entity(&nodes[j], |n, _| (
+                        n.x, // Left edge of target node
+                        n.y + px(node_height / 2.0) // Vertically centered
+                    ));
 
                     // Offset by bounds.origin so edges are drawn relative to container
                     let p1 = point(offset.x + pan.x + x1 * zoom, offset.y + pan.y + y1 * zoom);
