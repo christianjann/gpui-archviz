@@ -19,6 +19,46 @@ pub struct Example {
 
 const EXAMPLE: &str = include_str!("../tests/model/vehicle.kdl");
 
+/// Estimate node size based on name, type, and children (mirrors GpugNode::estimate_dimensions)
+fn estimate_node_size(name: &str, node_type: &str, children: &[NodeChild]) -> (f32, f32) {
+    let base_width = 120.0f32;
+    let header_height = 28.0f32;
+    let char_width = 7.2f32;
+    let padding = 24.0f32;
+    
+    // Width from name and type
+    let name_width = name.len() as f32 * char_width + padding;
+    let type_width = node_type.len() as f32 * 6.0 + 40.0;
+    let mut content_width = name_width.max(type_width).max(base_width);
+    
+    if children.is_empty() {
+        return (content_width, header_height);
+    }
+    
+    // Estimate height: header + partitions stacked vertically
+    let mut total_child_height = 0.0f32;
+    let mut max_partition_width = 0.0f32;
+    
+    for child in children {
+        let swc_count = child.children.len().max(1);
+        let partition_height = 40.0 + (swc_count as f32 * 45.0);
+        total_child_height += partition_height + 8.0;
+        
+        let partition_name_width = child.name.len() as f32 * 6.0 + 50.0;
+        let max_swc_width = child.children.iter()
+            .map(|s| s.name.len() as f32 * 6.0 + 50.0)
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(60.0);
+        let partition_width = partition_name_width.max(max_swc_width * 2.0 + 20.0);
+        max_partition_width = max_partition_width.max(partition_width);
+    }
+    
+    content_width = content_width.max(max_partition_width + 16.0);
+    let node_height = header_height + total_child_height + 12.0;
+    
+    (content_width, node_height)
+}
+
 /// Parse KDL content and extract nodes (ECUs and buses) with their connections
 fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
     let mut nodes = Vec::new();
@@ -36,13 +76,21 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
     let mut index: usize = 0;
     
     // Layout parameters for positioning nodes
-    let bus_y = 100.0f32;
-    let ecu_y = 300.0f32;
-    let start_x = 100.0f32;
-    let spacing = 200.0f32;
+    let bus_y = 50.0f32;
+    let ecu_y = 150.0f32;
+    let start_x = 50.0f32;
     
-    let mut bus_count = 0usize;
-    let mut ecu_count = 0usize;
+    // First pass: collect all nodes with their estimated sizes
+    struct NodeInfo {
+        name: String,
+        node_type: String,
+        children: Vec<NodeChild>,
+        estimated_width: f32,
+        estimated_height: f32,
+    }
+    
+    let mut bus_nodes: Vec<NodeInfo> = Vec::new();
+    let mut ecu_nodes: Vec<NodeInfo> = Vec::new();
     
     for kdl_node in doc.nodes() {
         let name = kdl_node.name().to_string();
@@ -54,21 +102,8 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
             .map(|s| s.to_string());
         
         if let Some(type_val) = node_type {
-            let (x, y) = match type_val.as_str() {
-                "bus" => {
-                    let pos = (start_x + bus_count as f32 * spacing, bus_y);
-                    bus_count += 1;
-                    pos
-                }
-                "ecu" => {
-                    let pos = (start_x + ecu_count as f32 * spacing, ecu_y);
-                    ecu_count += 1;
-                    pos
-                }
-                _ => continue,
-            };
-            
             node_name_to_index.insert(name.clone(), index);
+            index += 1;
             
             // Extract children (partitions and swcs) for ECUs
             let children = if type_val == "ecu" {
@@ -77,25 +112,68 @@ fn parse_kdl_model(content: &str) -> (Vec<GpugNode>, Vec<GpugEdge>) {
                 Vec::new()
             };
             
-            nodes.push(GpugNode {
-                id,
-                name: name.clone(),
-                node_type: type_val,
-                children,
-                x: px(x),
-                y: px(y),
-                drag_offset: None,
-                zoom: 1.0,
-                pan: point(px(0.0), px(0.0)),
-                selected: false,
-                container_offset: point(px(0.0), px(0.0)),
-                width: 80.0, // Default width, will be updated after first render
-                height: 32.0, // Default height, will be updated after first render
-            });
+            // Estimate node size for layout
+            let (estimated_width, estimated_height) = estimate_node_size(&name, &type_val, &children);
             
-            id += 1;
-            index += 1;
+            let info = NodeInfo {
+                name,
+                node_type: type_val.clone(),
+                children,
+                estimated_width,
+                estimated_height,
+            };
+            
+            match type_val.as_str() {
+                "bus" => bus_nodes.push(info),
+                "ecu" => ecu_nodes.push(info),
+                _ => {}
+            }
         }
+    }
+    
+    // Layout buses in a row with proper spacing
+    let gap = 30.0f32;
+    let mut bus_x = start_x;
+    for info in &bus_nodes {
+        nodes.push(GpugNode {
+            id,
+            name: info.name.clone(),
+            node_type: info.node_type.clone(),
+            children: info.children.clone(),
+            x: px(bus_x),
+            y: px(bus_y),
+            drag_offset: None,
+            zoom: 1.0,
+            pan: point(px(0.0), px(0.0)),
+            selected: false,
+            container_offset: point(px(0.0), px(0.0)),
+            width: info.estimated_width,
+            height: info.estimated_height,
+        });
+        bus_x += info.estimated_width + gap;
+        id += 1;
+    }
+    
+    // Layout ECUs in a row below buses with proper spacing
+    let mut ecu_x = start_x;
+    for info in &ecu_nodes {
+        nodes.push(GpugNode {
+            id,
+            name: info.name.clone(),
+            node_type: info.node_type.clone(),
+            children: info.children.clone(),
+            x: px(ecu_x),
+            y: px(ecu_y),
+            drag_offset: None,
+            zoom: 1.0,
+            pan: point(px(0.0), px(0.0)),
+            selected: false,
+            container_offset: point(px(0.0), px(0.0)),
+            width: info.estimated_width,
+            height: info.estimated_height,
+        });
+        ecu_x += info.estimated_width + gap;
+        id += 1;
     }
     
     // Second pass: find interface connections from ECUs to buses

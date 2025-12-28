@@ -525,13 +525,17 @@ impl Render for Graph {
 
                 window.request_animation_frame();
 
-                // Read positions
+                // Read positions and sizes
                 let mut xs: Vec<f32> = Vec::with_capacity(n);
                 let mut ys: Vec<f32> = Vec::with_capacity(n);
+                let mut widths: Vec<f32> = Vec::with_capacity(n);
+                let mut heights: Vec<f32> = Vec::with_capacity(n);
                 for ent in &nodes_for_sim {
-                    let (x, y) = cx.read_entity(ent, |nd, _| (nd.x, nd.y));
+                    let (x, y, w, h) = cx.read_entity(ent, |nd, _| (nd.x, nd.y, nd.width, nd.height));
                     xs.push((x / px(1.0)) as f32);
                     ys.push((y / px(1.0)) as f32);
+                    widths.push(w);
+                    heights.push(h);
                 }
 
                 let mut fx = vec![0.0f32; n];
@@ -550,7 +554,9 @@ impl Render for Graph {
 
                 // Spatial grid for approximate repulsion
                 use std::collections::HashMap;
-                let cell = 150.0f32; // larger cell size for bigger nodes
+                // Cell size must be larger than max node dimension to catch all overlaps
+                let max_node_dim = widths.iter().chain(heights.iter()).cloned().fold(0.0f32, f32::max);
+                let cell = (max_node_dim + 100.0).max(300.0f32);
                 let mut bins: HashMap<(i32, i32), Vec<usize>> = HashMap::with_capacity(n * 2);
                 for i in 0..n {
                     let gx = (xs[i] / cell).floor() as i32;
@@ -577,8 +583,14 @@ impl Render for Graph {
                                 if j <= i {
                                     continue;
                                 }
-                                let dx = xs[j] - xs[i];
-                                let dy = ys[j] - ys[i];
+                                // Centers of nodes
+                                let cx_i = xs[i] + widths[i] / 2.0;
+                                let cy_i = ys[i] + heights[i] / 2.0;
+                                let cx_j = xs[j] + widths[j] / 2.0;
+                                let cy_j = ys[j] + heights[j] / 2.0;
+
+                                let dx = cx_j - cx_i;
+                                let dy = cy_j - cy_i;
                                 let d2 = dx * dx + dy * dy + 0.01;
                                 let inv = 1.0 / d2;
                                 let fx_ij = repulsion * dx * inv;
@@ -629,6 +641,56 @@ impl Render for Graph {
                     }
                     xs[i] += dx;
                     ys[i] += dy;
+                }
+
+                // Overlap resolution pass - push overlapping nodes apart directly
+                let padding = 20.0f32; // Minimum gap between nodes
+                for _ in 0..3 {
+                    // Multiple iterations for better resolution
+                    for i in 0..n {
+                        for j in (i + 1)..n {
+                            // Required separation
+                            let sep_x = (widths[i] + widths[j]) / 2.0 + padding;
+                            let sep_y = (heights[i] + heights[j]) / 2.0 + padding;
+
+                            // Centers of nodes
+                            let cx_i = xs[i] + widths[i] / 2.0;
+                            let cy_i = ys[i] + heights[i] / 2.0;
+                            let cx_j = xs[j] + widths[j] / 2.0;
+                            let cy_j = ys[j] + heights[j] / 2.0;
+
+                            let dx = cx_j - cx_i;
+                            let dy = cy_j - cy_i;
+
+                            let overlap_x = sep_x - dx.abs();
+                            let overlap_y = sep_y - dy.abs();
+
+                            if overlap_x > 0.0 && overlap_y > 0.0 {
+                                // Push apart along the axis of least overlap
+                                if overlap_x < overlap_y {
+                                    // Push horizontally
+                                    let push = overlap_x / 2.0 + 1.0;
+                                    if dx >= 0.0 {
+                                        xs[i] -= push;
+                                        xs[j] += push;
+                                    } else {
+                                        xs[i] += push;
+                                        xs[j] -= push;
+                                    }
+                                } else {
+                                    // Push vertically
+                                    let push = overlap_y / 2.0 + 1.0;
+                                    if dy >= 0.0 {
+                                        ys[i] -= push;
+                                        ys[j] += push;
+                                    } else {
+                                        ys[i] += push;
+                                        ys[j] -= push;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Write back
