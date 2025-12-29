@@ -985,7 +985,8 @@ impl Render for Graph {
                                 }
                             }
                             let target = this.nodes[i].clone();
-                            let (node_id, span) = cx.read_entity(&target, |node, _| (node.id, node.span));
+                            let (node_id, span) =
+                                cx.read_entity(&target, |node, _| (node.id, node.span));
                             cx.update_entity(&target, |node, _| {
                                 node.selected = true;
                             });

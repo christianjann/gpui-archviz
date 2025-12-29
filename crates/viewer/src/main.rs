@@ -8,8 +8,8 @@ use gpui_component::{
 use gpui_component_assets::Assets;
 use gpui_component_story::Open;
 use graphview::{EdgeRouting, Graph, NodeSelected};
-use tracing::{info, error};
 use lsp_types::Position;
+use tracing::{error, info};
 
 mod kdl;
 use kdl::parse_kdl_model;
@@ -74,60 +74,64 @@ impl Example {
         // Subscribe to input changes and update the graph
         let graph_for_sub = graph.clone();
         let input_state_for_graph = input_state.clone();
-        let _subscriptions =
-            vec![
-                cx.subscribe(&input_state, move |_this, input, event: &InputEvent, cx| {
-                    if let InputEvent::Change = event {
-                        let content = input.read(cx).value();
-                        let (nodes, edges) = parse_kdl_model(&content);
-                        // Only update if we have valid nodes (KDL parsed successfully with content)
-                        if !nodes.is_empty() {
-                            graph_for_sub.update(cx, |graph, cx| {
-                                graph.update_model(nodes, edges, cx);
-                            });
-                        } else {
-                            error!("Document has errors, not updating graph!")
-                        }
+        let _subscriptions = vec![
+            cx.subscribe(&input_state, move |_this, input, event: &InputEvent, cx| {
+                if let InputEvent::Change = event {
+                    let content = input.read(cx).value();
+                    let (nodes, edges) = parse_kdl_model(&content);
+                    // Only update if we have valid nodes (KDL parsed successfully with content)
+                    if !nodes.is_empty() {
+                        graph_for_sub.update(cx, |graph, cx| {
+                            graph.update_model(nodes, edges, cx);
+                        });
+                    } else {
+                        error!("Document has errors, not updating graph!")
                     }
-                }),
-                cx.observe(&input_state, move |this, input, cx| {
-                    let pos = input.read(cx).cursor_position();
-                    if Some(pos) != this.last_cursor_pos {
-                        this.last_cursor_pos = Some(pos);
-                        let content = input.read(cx).value();
-                        let cursor = line_char_to_offset(&content, pos.line as usize, pos.character as usize);
-                        info!("Cursor moved to byte position: {}", cursor);
-                        this.graph.update(cx, |graph, cx| {
-                            // Deselect all
-                            for n in &graph.nodes {
-                                cx.update_entity(n, |node, _| node.selected = false);
-                            }
-                            // Select the node at cursor
-                            for node_entity in &graph.nodes {
-                                let span = cx.read_entity(node_entity, |n, _| n.span);
-                                if let Some((s, e)) = span {
-                                    if s <= cursor && cursor <= e {
-                                        let node_name = cx.read_entity(node_entity, |n, _| n.name.clone());
-                                        cx.update_entity(node_entity, |node, _| node.selected = true);
-                                        info!("Selected node: {}", node_name);
-                                        break;
-                                    }
+                }
+            }),
+            cx.observe(&input_state, move |this, input, cx| {
+                let pos = input.read(cx).cursor_position();
+                if Some(pos) != this.last_cursor_pos {
+                    this.last_cursor_pos = Some(pos);
+                    let content = input.read(cx).value();
+                    let cursor =
+                        line_char_to_offset(&content, pos.line as usize, pos.character as usize);
+                    info!("Cursor moved to byte position: {}", cursor);
+                    this.graph.update(cx, |graph, cx| {
+                        // Deselect all
+                        for n in &graph.nodes {
+                            cx.update_entity(n, |node, _| node.selected = false);
+                        }
+                        // Select the node at cursor
+                        for node_entity in &graph.nodes {
+                            let span = cx.read_entity(node_entity, |n, _| n.span);
+                            if let Some((s, e)) = span {
+                                if s <= cursor && cursor <= e {
+                                    let node_name =
+                                        cx.read_entity(node_entity, |n, _| n.name.clone());
+                                    cx.update_entity(node_entity, |node, _| node.selected = true);
+                                    info!("Selected node: {}", node_name);
+                                    break;
                                 }
                             }
-                        });
-                    }
-                }),
-                cx.subscribe(&graph, move |_this, _graph, event: &NodeSelected, cx| {
-                    info!("Node selected in graph: id={}, span={:?}", event.node_id, event.span);
-                    // Set text selection to event.span
-                    if let Some((start, end)) = event.span {
-                        info!("Setting text selection to {}..{}", start, end);
-                        input_state_for_graph.update(cx, |input, cx| {
-                            input.set_selection_range(start, end, cx);
-                        });
-                    }
-                }),
-            ];
+                        }
+                    });
+                }
+            }),
+            cx.subscribe(&graph, move |_this, _graph, event: &NodeSelected, cx| {
+                info!(
+                    "Node selected in graph: id={}, span={:?}",
+                    event.node_id, event.span
+                );
+                // Set text selection to event.span
+                if let Some((start, end)) = event.span {
+                    info!("Setting text selection to {}..{}", start, end);
+                    input_state_for_graph.update(cx, |input, cx| {
+                        input.set_selection_range(start, end, cx);
+                    });
+                }
+            }),
+        ];
 
         Self {
             input_state,
