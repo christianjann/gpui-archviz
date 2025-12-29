@@ -1,4 +1,4 @@
-# Graph
+# GraphView
 
 A GPUI-based graph visualization library for interactive node-edge diagrams.
 
