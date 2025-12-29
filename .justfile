@@ -9,6 +9,9 @@ fmt:
 clippy:
     cargo clippy --all-targets -- -D warnings
 
+fix:
+    cargo clippy --all-targets --fix --allow-dirty
+
 build:
     cargo build
 
@@ -32,3 +35,6 @@ install:
 
 watch:
     cargo watch -x 'run'
+
+layout-test:
+    cargo test -p layout -- --nocapture
