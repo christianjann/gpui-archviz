@@ -9,6 +9,7 @@ use gpui_component_assets::Assets;
 use gpui_component_story::Open;
 use graphview::{EdgeRouting, Graph, NodeSelected};
 use tracing::{info, error};
+use lsp_types::Position;
 
 mod kdl;
 use kdl::parse_kdl_model;
@@ -16,6 +17,7 @@ use kdl::parse_kdl_model;
 pub struct Example {
     input_state: Entity<InputState>,
     graph: Entity<Graph>,
+    last_cursor_pos: Option<Position>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -75,9 +77,6 @@ impl Example {
         let _subscriptions =
             vec![
                 cx.subscribe(&input_state, move |_this, input, event: &InputEvent, cx| {
-                    info!("Input event received");
-                    let pos = input.read(cx).cursor_position();
-                    info!("Cursor position: line={}, character={}", pos.line, pos.character);
                     if let InputEvent::Change = event {
                         let content = input.read(cx).value();
                         let (nodes, edges) = parse_kdl_model(&content);
@@ -85,29 +84,37 @@ impl Example {
                         if !nodes.is_empty() {
                             graph_for_sub.update(cx, |graph, cx| {
                                 graph.update_model(nodes, edges, cx);
-                                // After updating, select the node at the current cursor position
-                                let cursor = line_char_to_offset(&content, pos.line as usize, pos.character as usize);
-                                info!("Cursor at byte position: {}", cursor);
-                                for node_entity in &graph.nodes {
-                                    let span = cx.read_entity(node_entity, |n, _| n.span);
-                                    if let Some((s, e)) = span {
-                                        if s <= cursor && cursor < e {
-                                            // Deselect all
-                                            for n in &graph.nodes {
-                                                cx.update_entity(n, |node, _| node.selected = false);
-                                            }
-                                            // Select this one
-                                            let node_name = cx.read_entity(node_entity, |n, _| n.name.clone());
-                                            cx.update_entity(node_entity, |node, _| node.selected = true);
-                                            info!("Selected node: {}", node_name);
-                                            break;
-                                        }
-                                    }
-                                }
                             });
                         } else {
                             error!("Document has errors, not updating graph!")
                         }
+                    }
+                }),
+                cx.observe(&input_state, move |this, input, cx| {
+                    let pos = input.read(cx).cursor_position();
+                    if Some(pos) != this.last_cursor_pos {
+                        this.last_cursor_pos = Some(pos);
+                        let content = input.read(cx).value();
+                        let cursor = line_char_to_offset(&content, pos.line as usize, pos.character as usize);
+                        info!("Cursor moved to byte position: {}", cursor);
+                        this.graph.update(cx, |graph, cx| {
+                            // Deselect all
+                            for n in &graph.nodes {
+                                cx.update_entity(n, |node, _| node.selected = false);
+                            }
+                            // Select the node at cursor
+                            for node_entity in &graph.nodes {
+                                let span = cx.read_entity(node_entity, |n, _| n.span);
+                                if let Some((s, e)) = span {
+                                    if s <= cursor && cursor <= e {
+                                        let node_name = cx.read_entity(node_entity, |n, _| n.name.clone());
+                                        cx.update_entity(node_entity, |node, _| node.selected = true);
+                                        info!("Selected node: {}", node_name);
+                                        break;
+                                    }
+                                }
+                            }
+                        });
                     }
                 }),
                 cx.subscribe(&graph, move |_this, _graph, event: &NodeSelected, cx| {
@@ -125,6 +132,7 @@ impl Example {
         Self {
             input_state,
             graph,
+            last_cursor_pos: None,
             _subscriptions,
         }
     }
