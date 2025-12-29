@@ -9,6 +9,8 @@ resolver = "2"
 [workspace.package]
 publish = false
 edition = "2024"
+license = "MIT"
+authors = ["Christian Jann <christian.jann@ymail.com>"]
 
 [workspace.dependencies]
 gpui-component = { git = "https://github.com/christianjann/gpui-component.git", branch = "archviz"}

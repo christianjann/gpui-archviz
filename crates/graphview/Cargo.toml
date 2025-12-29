@@ -1,6 +1,10 @@
 [package]
 name = "graphview"
 version = "0.1.0"
+authors = [
+    "jerlendds <oss@osintbuddy.com>",
+    "Christian Jann <christian.jann@ymail.com>",
+]
 edition.workspace = true
 publish = false
 readme = "README.md"
@@ -11,11 +15,6 @@ categories = ["gui"]
 name = "graphview"
 path = "src/lib.rs"
 doctest = false
-
-
-#[[bin]]
-#name = "gpug"
-#path = "src/main.rs"
 
 [dependencies]
 dagre-rs.workspace = true
