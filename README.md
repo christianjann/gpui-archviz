@@ -4,6 +4,9 @@ A demo application for experimenting with [GPUI](https://gpui.rs/) and layouting
 
 ![Demo Screenshot](doc/screenshot.png)
 
+The selection between the graph view and the code editor is automatically synchronized:
+![Demo Screencast](doc/screencast.gif)
+
 ## About
 
 This is an experimental project to explore:
@@ -40,6 +43,7 @@ This is an experimental project to explore:
 - 🎨 **Edge Highlighting** - Orange for outgoing edges, blue for incoming edges
 - 📦 **Nested Nodes** - ECUs contain partitions which contain software components
 - ↔️ **Manhattan Routing** - Clean orthogonal edge paths
+- 🔄 **Bidirectional Highlighting** - Text edits highlight corresponding graph nodes; graph node clicks select and center text ranges; cursor movement in text highlights graph nodes
 
 ## Building
 
@@ -54,9 +58,10 @@ cargo run
 
 ## Usage
 
-1. Edit the KDL model in the left panel
-2. The graph visualization updates in the right panel
-3. Use the controls:
+1. Edit the KDL model in the left panel to see graph updates
+2. Click graph nodes to select and center the corresponding text range
+3. Move the cursor in the text editor to highlight the associated graph node
+4. Use the controls:
    - **Zoom**: `+`/`-` buttons or mouse wheel
    - **Pan**: Middle mouse button drag or scroll
    - **Fit**: Click "Fit" to fit all nodes in view
@@ -81,6 +86,9 @@ BodyController type="ecu" {
 ## Known issues
 - When maximizing the window the cursor stays in resize mode outside the original window area unit first manual resize of the window
 - Sometimes the draping cursor is stuck at dragging, what helps is a right or middle click of the mouse
+
+## Next steps
+- Implement better auto-layout
 
 ## License
 
