@@ -11,9 +11,9 @@ publish = false
 edition = "2024"
 
 [workspace.dependencies]
-gpui-component = { path = "../gpui-component/crates/ui" }
-gpui-component-macros = { path = "../gpui-component/crates/macros" }
-gpui-component-assets = { path = "../gpui-component/crates/assets" }
+gpui-component = { git = "https://github.com/christianjann/gpui-component.git", branch = "archviz"}
+gpui-component-macros = { git = "https://github.com/christianjann/gpui-component.git", branch = "archviz"}
+gpui-component-assets = { git = "https://github.com/christianjann/gpui-component.git", branch = "archviz"}
 
 gpui = { version = "0.2.2" }
 gpui-macros = "0.2.2"
