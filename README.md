@@ -11,6 +11,7 @@ The selection between the graph view and the code editor is automatically synchr
 
 This is an experimental project to explore:
 - Building interactive graph visualizations with GPUI (Zed's GPU-accelerated UI framework)
+- Custom layout algorithms for architecture diagrams with force-directed positioning and orthogonal edge routing
 - Layouting algorithms for architecture diagrams (Force-directed and Dagre/Sugiyama hierarchical layouts)
 - Rendering nodes with nested children (ECUs with partitions and software components)
 - Edge routing with Manhattan-style orthogonal paths
@@ -31,6 +32,7 @@ This is an experimental project to explore:
 - **[Rust](https://www.rust-lang.org/)** - Systems programming language
 - **[GPUI](https://gpui.rs/)** - GPU-accelerated UI framework from Zed
 - **[gpui-component](https://github.com/longbridge/gpui-component)** - UI component library for GPUI
+- **[archviz-layout](../crates/layout/)** - Custom force-directed graph layout with orthogonal edge routing
 - **[dagre-rs](https://crates.io/crates/dagre-rs)** - Hierarchical graph layout (Sugiyama method)
 - **[petgraph](https://crates.io/crates/petgraph)** - Graph data structures
 - **[KDL](https://kdl.dev/)** - Document language for model files
@@ -38,12 +40,18 @@ This is an experimental project to explore:
 ## Features
 
 - 📊 **Graph Visualization** - Interactive node-based diagrams
-- 🔄 **Multiple Layouts** - Force-directed simulation or Dagre hierarchical layout
+- 🔄 **Multiple Layouts** - Force-directed simulation, Dagre hierarchical layout, and custom orthogonal layout algorithm
 - 🖱️ **Interactive** - Pan, zoom, drag nodes, click to select
 - 🎨 **Edge Highlighting** - Orange for outgoing edges, blue for incoming edges
 - 📦 **Nested Nodes** - ECUs contain partitions which contain software components
-- ↔️ **Manhattan Routing** - Clean orthogonal edge paths
+- ↔️ **Manhattan Routing** - Clean orthogonal edge paths with obstacle avoidance
 - 🔄 **Bidirectional Highlighting** - Text edits highlight corresponding graph nodes; graph node clicks select and center text ranges; cursor movement in text highlights graph nodes
+
+## Documentation
+
+- **[Layout Algorithm](../../doc/layout/custom.md)**: Detailed design document for the custom graph layout algorithm
+- **[Layout Crate](../crates/layout/README.md)**: API documentation for the layout library
+- **[GraphView Crate](../crates/graphview/README.md)**: Documentation for the GPUI graph visualization component
 
 ## Building
 
@@ -65,7 +73,7 @@ cargo run
    - **Zoom**: `+`/`-` buttons or mouse wheel
    - **Pan**: Middle mouse button drag or scroll
    - **Fit**: Click "Fit" to fit all nodes in view
-   - **Layout**: Toggle between "Force" and "Dagre" layout modes
+   - **Layout**: Toggle between "Force" (physics simulation), "Dagre" (hierarchical) layout and custom layout modes
    - **Play/Refresh**: In Force mode, toggles simulation; in Dagre mode, re-applies layout
 
 ## Model Format (KDL)
@@ -87,8 +95,6 @@ BodyController type="ecu" {
 - When maximizing the window the cursor stays in resize mode outside the original window area until first manual resize of the window
 - Sometimes the draping cursor is stuck at dragging, what helps is a right or middle click of the mouse
 
-## Next steps
-- Implement better auto-layout
 
 ## License
 
