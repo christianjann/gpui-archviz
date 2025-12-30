@@ -31,7 +31,8 @@ pub struct Node {
     pub id: String,
     pub size: Size,
     pub position: Position,
-    pub ports: Vec<Port>, // up to 8 ports
+    pub ports: Vec<Port>,                  // up to 8 ports
+    pub attributes: Vec<(String, String)>, // optional key-value attributes
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +82,7 @@ struct Grid {
 }
 
 impl Grid {
-    fn new(nodes: &[Node], canvas_width: f64, canvas_height: f64, cell_size: f64) -> Self {
+    fn new(nodes: &[Node], _canvas_width: f64, _canvas_height: f64, cell_size: f64) -> Self {
         let min_x = nodes
             .iter()
             .map(|n| n.position.x)
@@ -105,12 +106,12 @@ impl Grid {
         let mut obstacles = vec![vec![false; width]; height];
 
         for node in nodes {
-            let x1 = ((node.position.x - 2.0 - min_x) / cell_size).floor() as usize;
-            let y1 = ((node.position.y - 2.0 - min_y) / cell_size).floor() as usize;
+            let x1 = ((node.position.x - 7.0 - min_x) / cell_size).floor() as usize;
+            let y1 = ((node.position.y - 7.0 - min_y) / cell_size).floor() as usize;
             let x2 =
-                ((node.position.x + node.size.width + 2.0 - min_x) / cell_size).ceil() as usize;
+                ((node.position.x + node.size.width + 7.0 - min_x) / cell_size).ceil() as usize;
             let y2 =
-                ((node.position.y + node.size.height + 2.0 - min_y) / cell_size).ceil() as usize;
+                ((node.position.y + node.size.height + 7.0 - min_y) / cell_size).ceil() as usize;
 
             for y in y1..y2.min(height) {
                 for x in x1..x2.min(width) {
@@ -120,13 +121,26 @@ impl Grid {
         }
 
         // Block port areas
-        /*
         for node in nodes {
             for port in &node.ports {
-                let port_x1 = (((node.position.x + port.position.x - min_x) / cell_size).floor() as i32 - 1).max(0) as usize;
-                let port_y1 = (((node.position.y + port.position.y - min_y) / cell_size).floor() as i32 - 1).max(0) as usize;
-                let port_x2 = (((node.position.x + port.position.x + port.size.width - min_x) / cell_size).ceil() as i32 + 1).min((width - 1) as i32) as usize + 1;
-                let port_y2 = (((node.position.y + port.position.y + port.size.height - min_y) / cell_size).ceil() as i32 + 1).min((height - 1) as i32) as usize + 1;
+                let port_x1 =
+                    (((node.position.x + port.position.x - min_x) / cell_size).floor() as i32 - 2)
+                        .max(0) as usize;
+                let port_y1 =
+                    (((node.position.y + port.position.y - min_y) / cell_size).floor() as i32 - 2)
+                        .max(0) as usize;
+                let port_x2 = (((node.position.x + port.position.x + port.size.width - min_x)
+                    / cell_size)
+                    .ceil() as i32
+                    + 2)
+                .min((width - 1) as i32) as usize
+                    + 1;
+                let port_y2 = (((node.position.y + port.position.y + port.size.height - min_y)
+                    / cell_size)
+                    .ceil() as i32
+                    + 2)
+                .min((height - 1) as i32) as usize
+                    + 1;
 
                 for y in port_y1..port_y2.min(height) {
                     for x in port_x1..port_x2.min(width) {
@@ -135,7 +149,6 @@ impl Grid {
                 }
             }
         }
-        */
 
         Grid {
             cell_size,
@@ -148,8 +161,8 @@ impl Grid {
     }
 
     fn pos_to_grid(&self, pos: &Position) -> (usize, usize) {
-        let x = (((pos.x - self.origin_x) / self.cell_size).floor() as usize).min(self.width - 1);
-        let y = (((pos.y - self.origin_y) / self.cell_size).floor() as usize).min(self.height - 1);
+        let x = (((pos.x - self.origin_x) / self.cell_size).round() as usize).min(self.width - 1);
+        let y = (((pos.y - self.origin_y) / self.cell_size).round() as usize).min(self.height - 1);
         (x, y)
     }
 
@@ -384,7 +397,7 @@ impl CustomLayout {
         let _canvas_width = (max_x - min_x + 100.0).max(400.0);
         let _canvas_height = (max_y - min_y + 100.0).max(300.0);
 
-        let cell_size = 10.0;
+        let cell_size = 5.0;
         let mut grid = Grid::new(nodes, _canvas_width, _canvas_height, cell_size);
 
         let mut routed_edges = vec![];
@@ -406,27 +419,28 @@ impl CustomLayout {
             grid.obstacles[source_grid.1][source_grid.0] = false;
             grid.obstacles[target_grid.1][target_grid.0] = false;
 
-            // Calculate direction for source
-            let dx = target_node.position.x + target_node.size.width / 2.0
-                - (source_node.position.x + source_node.size.width / 2.0);
-            let dy = target_node.position.y + target_node.size.height / 2.0
-                - (source_node.position.y + source_node.size.height / 2.0);
-            let source_direction = if dx.abs() > dy.abs() {
-                if dx > 0.0 { "right" } else { "left" }
+            // Calculate direction for source based on port side
+            let source_side = if (source_pos.x - source_node.position.x).abs() < 10.0 {
+                "left"
+            } else if (source_pos.x - (source_node.position.x + source_node.size.width)).abs() < 10.0 {
+                "right"
+            } else if (source_pos.y - source_node.position.y).abs() < 10.0 {
+                "top"
             } else {
-                if dy > 0.0 { "bottom" } else { "top" }
+                "bottom"
             };
 
             let source_ext_x = source_grid_pos.x
-                + match source_direction {
-                    "right" => 10.0,
-                    "left" => -10.0,
+                + match source_side {
+                    "right" => 25.0,
+                    "left" => -25.0,
                     _ => 0.0,
                 };
             let source_ext_y = source_grid_pos.y
-                + match source_direction {
-                    "bottom" => 10.0,
-                    "top" => -10.0,
+                + match source_side {
+                    "bottom" => 25.0,
+                    "top" => -25.0,
+                    "right" => 0.0,
                     _ => 0.0,
                 };
             let source_ext_end = Position {
@@ -434,33 +448,38 @@ impl CustomLayout {
                 y: source_ext_y,
             };
 
-            // Calculate direction for target
-            let dx = source_node.position.x + source_node.size.width / 2.0
-                - (target_node.position.x + target_node.size.width / 2.0);
-            let dy = source_node.position.y + source_node.size.height / 2.0
-                - (target_node.position.y + target_node.size.height / 2.0);
-            let target_direction = if dx.abs() > dy.abs() {
-                if dx > 0.0 { "right" } else { "left" }
+            let source_ext_end = nearest_grid(&source_ext_end, grid.origin_x, grid.origin_y, cell_size);
+            
+            // Calculate direction for target based on port side
+            let target_side = if (target_pos.x - target_node.position.x).abs() < 10.0 {
+                "left"
+            } else if (target_pos.x - (target_node.position.x + target_node.size.width)).abs() < 10.0 {
+                "right"
+            } else if (target_pos.y - target_node.position.y).abs() < 10.0 {
+                "top"
             } else {
-                if dy > 0.0 { "bottom" } else { "top" }
+                "bottom"
             };
 
             let target_ext_x = target_grid_pos.x
-                + match target_direction {
-                    "right" => 10.0,
-                    "left" => -10.0,
+                + match target_side {
+                    "right" => 25.0,
+                    "left" => -25.0,
                     _ => 0.0,
                 };
             let target_ext_y = target_grid_pos.y
-                + match target_direction {
-                    "bottom" => 10.0,
-                    "top" => -10.0,
+                + match target_side {
+                    "bottom" => 25.0,
+                    "top" => -25.0,
+                    "right" => 0.0,
                     _ => 0.0,
                 };
             let target_ext_end = Position {
                 x: target_ext_x,
                 y: target_ext_y,
             };
+
+            let target_ext_end = nearest_grid(&target_ext_end, grid.origin_x, grid.origin_y, cell_size);
 
             let source_ext_grid = grid.pos_to_grid(&source_ext_end);
             grid.obstacles[source_ext_grid.1][source_ext_grid.0] = false;
@@ -472,6 +491,15 @@ impl CustomLayout {
             let mut full_path = vec![source_grid_pos];
             full_path.extend(path);
             full_path.push(target_grid_pos);
+
+            // Debug: check for diagonal segments
+            for i in 1..full_path.len() {
+                let p1 = &full_path[i-1];
+                let p2 = &full_path[i];
+                if p1.x != p2.x && p1.y != p2.y {
+                    println!("WARNING: Diagonal segment calculated: ({}, {}) to ({}, {})", p1.x, p1.y, p2.x, p2.y);
+                }
+            }
 
             routed_edges.push(Edge {
                 source,
@@ -499,78 +527,61 @@ impl CustomLayout {
                 y: snapped_y,
             }
         } else {
-            // Select port on side facing the target
-            let dx = to_node.position.x + to_node.size.width / 2.0
-                - (from_node.position.x + from_node.size.width / 2.0);
-            let dy = to_node.position.y + to_node.size.height / 2.0
-                - (from_node.position.y + from_node.size.height / 2.0);
+            // Calculate direction vector from from_node center to to_node center
+            let from_center_x = from_node.position.x + from_node.size.width / 2.0;
+            let from_center_y = from_node.position.y + from_node.size.height / 2.0;
+            let to_center_x = to_node.position.x + to_node.size.width / 2.0;
+            let to_center_y = to_node.position.y + to_node.size.height / 2.0;
 
-            // Determine direction
-            let side = if dx.abs() > dy.abs() {
-                if dx > 0.0 { "right" } else { "left" }
-            } else {
-                if dy > 0.0 { "bottom" } else { "top" }
-            };
+            let dx = to_center_x - from_center_x;
+            let dy = to_center_y - from_center_y;
 
-            // Find port on that side
+            // Find the port whose position best matches the direction
+            let mut best_port = None;
+            let mut best_score = f64::INFINITY;
+
             for port in &from_node.ports {
-                // Check exact position on side
-                match side {
-                    "right" if port.position.x == from_node.size.width => {
-                        let port_left = from_node.position.x + port.position.x;
-                        let port_top = from_node.position.y + port.position.y;
-                        let port_center_x = port_left + port.size.width / 2.0;
-                        let port_center_y = port_top + port.size.height / 2.0;
-                        return Position {
-                            x: port_center_x,
-                            y: port_center_y,
-                        };
+                let port_world_x = from_node.position.x + port.position.x + port.size.width / 2.0;
+                let port_world_y = from_node.position.y + port.position.y + port.size.height / 2.0;
+
+                let port_dx = port_world_x - from_center_x;
+                let port_dy = port_world_y - from_center_y;
+
+                // Score based on how well the port direction matches the target direction
+                // Lower score is better
+                let dot_product = port_dx * dx + port_dy * dy;
+                let port_magnitude = (port_dx * port_dx + port_dy * port_dy).sqrt();
+                let target_magnitude = (dx * dx + dy * dy).sqrt();
+
+                if port_magnitude > 0.0 && target_magnitude > 0.0 {
+                    let cos_angle = dot_product / (port_magnitude * target_magnitude);
+                    let score = 1.0 - cos_angle; // 0 when perfectly aligned, 2 when opposite
+                    if score < best_score {
+                        best_score = score;
+                        best_port = Some(port);
                     }
-                    "left" if port.position.x < 0.0 => {
-                        let port_left = from_node.position.x + port.position.x;
-                        let port_top = from_node.position.y + port.position.y;
-                        let port_center_x = port_left + port.size.width / 2.0;
-                        let port_center_y = port_top + port.size.height / 2.0;
-                        return Position {
-                            x: port_center_x,
-                            y: port_center_y,
-                        };
-                    }
-                    "bottom" if port.position.y == from_node.size.height => {
-                        let port_left = from_node.position.x + port.position.x;
-                        let port_top = from_node.position.y + port.position.y;
-                        let port_center_x = port_left + port.size.width / 2.0;
-                        let port_center_y = port_top + port.size.height / 2.0;
-                        return Position {
-                            x: port_center_x,
-                            y: port_center_y,
-                        };
-                    }
-                    "top" if port.position.y < 0.0 => {
-                        let port_left = from_node.position.x + port.position.x;
-                        let port_top = from_node.position.y + port.position.y;
-                        let port_center_x = port_left + port.size.width / 2.0;
-                        let port_center_y = port_top + port.size.height / 2.0;
-                        return Position {
-                            x: port_center_x,
-                            y: port_center_y,
-                        };
-                    }
-                    _ => {}
                 }
             }
-            // Fallback to center
-            let center_x = from_node.position.x + from_node.size.width / 2.0;
-            let center_y = from_node.position.y + from_node.size.height / 2.0;
-            let snapped_x = ((center_x / 10.0).round() * 10.0)
-                .max(from_node.position.x)
-                .min(from_node.position.x + from_node.size.width);
-            let snapped_y = ((center_y / 10.0).round() * 10.0)
-                .max(from_node.position.y)
-                .min(from_node.position.y + from_node.size.height);
-            Position {
-                x: snapped_x,
-                y: snapped_y,
+
+            if let Some(port) = best_port {
+                Position {
+                    x: from_node.position.x + port.position.x + port.size.width / 2.0,
+                    y: from_node.position.y + port.position.y + port.size.height / 2.0,
+                }
+            } else {
+                // Fallback to center if no suitable port found
+                let center_x = from_node.position.x + from_node.size.width / 2.0;
+                let center_y = from_node.position.y + from_node.size.height / 2.0;
+                let snapped_x = ((center_x / 10.0).round() * 10.0)
+                    .max(from_node.position.x)
+                    .min(from_node.position.x + from_node.size.width);
+                let snapped_y = ((center_y / 10.0).round() * 10.0)
+                    .max(from_node.position.y)
+                    .min(from_node.position.y + from_node.size.height);
+                Position {
+                    x: snapped_x,
+                    y: snapped_y,
+                }
             }
         }
     }
@@ -697,6 +708,7 @@ mod tests {
                         port_type: PortType::Output,
                     }, // bottom
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "B".to_string(),
@@ -739,6 +751,7 @@ mod tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
         ]
     }
@@ -812,7 +825,7 @@ mod integration_tests {
     use super::*;
     use std::fs;
 
-    fn generate_svg(result: &LayoutResult, filename: &str) {
+    fn generate_svg(result: &LayoutResult, filename: &str, show_grid: bool, show_all_ports: bool) {
         use std::collections::HashSet;
         let mut used_ports = HashSet::new();
 
@@ -866,21 +879,73 @@ mod integration_tests {
             result.canvas_width, result.canvas_height
         );
 
-        for (node_index, node) in result.nodes.iter().enumerate() {
+        // Add grid lines if requested
+        if show_grid {
+            let cell_size = 5.0;
+            let num_x_lines = (result.canvas_width / cell_size).ceil() as usize;
+            let num_y_lines = (result.canvas_height / cell_size).ceil() as usize;
+
+            // Vertical grid lines
+            for i in 0..=num_x_lines {
+                let x = i as f64 * cell_size;
+                svg.push_str(&format!(
+                    r#"<line x1="{}" y1="0" x2="{}" y2="{}" stroke="lightgray" stroke-width="0.5"/>
+"#,
+                    x, x, result.canvas_height
+                ));
+            }
+
+            // Horizontal grid lines
+            for i in 0..=num_y_lines {
+                let y = i as f64 * cell_size;
+                svg.push_str(&format!(
+                    r#"<line x1="0" y1="{}" x2="{}" y2="{}" stroke="lightgray" stroke-width="0.5"/>
+"#,
+                    y, result.canvas_width, y
+                ));
+            }
+        }
+
+        for (_node_index, node) in result.nodes.iter().enumerate() {
+            let fill_color = node
+                .attributes
+                .iter()
+                .find(|(k, _)| k == "color")
+                .map(|(_, v)| v.as_str())
+                .unwrap_or("lightblue");
+
             svg.push_str(&format!(
-                r#"<rect x="{}" y="{}" width="{}" height="{}" fill="lightblue" stroke="black"/>
+                r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="black"/>
 <text x="{}" y="{}" font-family="Arial" font-size="12" text-anchor="middle">{}</text>
 "#,
                 node.position.x,
                 node.position.y,
                 node.size.width,
                 node.size.height,
+                fill_color,
                 node.position.x + node.size.width / 2.0,
                 node.position.y + node.size.height / 2.0 + 5.0,
                 node.id
             ));
+        }
+
+        for edge in &result.edges {
+            if edge.path.len() >= 2 {
+                let mut path_data = format!("M {} {}", edge.path[0].x, edge.path[0].y);
+                for point in &edge.path[1..] {
+                    path_data.push_str(&format!(" L {} {}", point.x, point.y));
+                }
+                svg.push_str(&format!(
+                    r#"<path d="{}" stroke="black" stroke-width="2" fill="none"/>
+"#,
+                    path_data
+                ));
+            }
+        }
+
+        for (node_index, node) in result.nodes.iter().enumerate() {
             for (port_index, port) in node.ports.iter().enumerate() {
-                if used_ports.contains(&(node_index, port_index)) {
+                if show_all_ports || used_ports.contains(&(node_index, port_index)) {
                     let fill = match port.port_type {
                         PortType::Input => "lightblue",
                         PortType::Output => "lightcoral",
@@ -895,20 +960,6 @@ mod integration_tests {
                         fill
                     ));
                 }
-            }
-        }
-
-        for edge in &result.edges {
-            if edge.path.len() >= 2 {
-                let mut path_data = format!("M {} {}", edge.path[0].x, edge.path[0].y);
-                for point in &edge.path[1..] {
-                    path_data.push_str(&format!(" L {} {}", point.x, point.y));
-                }
-                svg.push_str(&format!(
-                    r#"<path d="{}" stroke="black" stroke-width="2" fill="none"/>
-"#,
-                    path_data
-                ));
             }
         }
 
@@ -961,6 +1012,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "ECU2".to_string(),
@@ -1003,6 +1055,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Sensor".to_string(),
@@ -1045,6 +1098,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
         ];
         let edges = vec![(0, 1), (1, 2), (0, 2)];
@@ -1067,7 +1121,7 @@ mod integration_tests {
             println!("  {} -> {}: {:?}", edge.source, edge.target, edge.path);
         }
 
-        generate_svg(&result, "test_set_1.svg");
+        generate_svg(&result, "test_set_1.svg", true, true);
     }
 
     #[test]
@@ -1114,6 +1168,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Display".to_string(),
@@ -1156,6 +1211,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Battery".to_string(),
@@ -1198,6 +1254,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Motor".to_string(),
@@ -1240,6 +1297,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
         ];
         let edges = vec![(0, 1), (0, 2), (0, 3), (1, 3), (2, 3)];
@@ -1263,7 +1321,7 @@ mod integration_tests {
             println!("  {} -> {}: {:?}", edge.source, edge.target, edge.path);
         }
 
-        generate_svg(&result, "test_set_2.svg");
+        generate_svg(&result, "test_set_2.svg", false, false);
     }
 
     #[test]
@@ -1310,6 +1368,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "ESP".to_string(),
@@ -1352,6 +1411,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Airbag".to_string(),
@@ -1394,6 +1454,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Climate".to_string(),
@@ -1436,6 +1497,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
             Node {
                 id: "Infotainment".to_string(),
@@ -1478,6 +1540,7 @@ mod integration_tests {
                         port_type: PortType::Output,
                     },
                 ],
+                attributes: vec![],
             },
         ];
         let edges = vec![(0, 1), (1, 2), (2, 3), (3, 4), (0, 4), (1, 3)];
@@ -1501,6 +1564,1027 @@ mod integration_tests {
             println!("  {} -> {}: {:?}", edge.source, edge.target, edge.path);
         }
 
-        generate_svg(&result, "test_set_3.svg");
+        generate_svg(&result, "test_set_3.svg", true, false);
+    }
+
+    #[test]
+    fn test_layout_set_4() {
+        let nodes = vec![
+            Node {
+                id: "Engine".to_string(),
+                size: Size {
+                    width: 140.0,
+                    height: 90.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 40.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 140.0, y: 40.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 65.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 65.0, y: 90.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Transmission".to_string(),
+                size: Size {
+                    width: 120.0,
+                    height: 70.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 120.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 55.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 55.0, y: 70.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Brakes".to_string(),
+                size: Size {
+                    width: 100.0,
+                    height: 60.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 100.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 45.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 45.0, y: 60.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Steering".to_string(),
+                size: Size {
+                    width: 110.0,
+                    height: 65.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 27.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 110.0, y: 27.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 50.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 50.0, y: 65.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Sensors".to_string(),
+                size: Size {
+                    width: 90.0,
+                    height: 50.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 90.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 40.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 40.0, y: 50.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Dashboard".to_string(),
+                size: Size {
+                    width: 130.0,
+                    height: 75.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 32.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 130.0, y: 32.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 60.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 60.0, y: 75.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "ECU".to_string(),
+                size: Size {
+                    width: 100.0,
+                    height: 55.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 100.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 45.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 45.0, y: 55.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "FuelPump".to_string(),
+                size: Size {
+                    width: 85.0,
+                    height: 45.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 17.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 85.0, y: 17.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 37.5, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 37.5, y: 45.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Alternator".to_string(),
+                size: Size {
+                    width: 95.0,
+                    height: 55.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 95.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 42.5, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 42.5, y: 55.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Radiator".to_string(),
+                size: Size {
+                    width: 110.0,
+                    height: 70.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 110.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 50.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 50.0, y: 70.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Battery".to_string(),
+                size: Size {
+                    width: 80.0,
+                    height: 60.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 80.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 35.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 35.0, y: 60.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "AirFilter".to_string(),
+                size: Size {
+                    width: 75.0,
+                    height: 40.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 15.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 75.0, y: 15.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 32.5, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 32.5, y: 40.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Exhaust".to_string(),
+                size: Size {
+                    width: 125.0,
+                    height: 50.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 125.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 57.5, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 57.5, y: 50.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            Node {
+                id: "Catalytic".to_string(),
+                size: Size {
+                    width: 105.0,
+                    height: 45.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 17.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 105.0, y: 17.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 47.5, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 47.5, y: 45.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+        ];
+        // Complex connectivity with cross-connections and potential routing challenges
+        let edges = vec![
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 6), // main chain
+            (0, 3),
+            (1, 4),
+            (2, 5),
+            (0, 6), // cross connections
+            (3, 6),
+            (4, 6), // additional connections to ECU
+            // New component connections
+            (0, 7),
+            (7, 8),
+            (8, 9),
+            (9, 10), // fuel system chain
+            (1, 11),
+            (11, 12),
+            (12, 13), // electrical system chain
+            (2, 9),
+            (3, 10),
+            (4, 11), // cooling system connections
+            (5, 12),
+            (6, 13), // exhaust system connections
+            (7, 10),
+            (8, 13),
+            (9, 6), // additional cross-connections
+        ];
+
+        let layout = CustomLayout {
+            allow_diagonals: false,
+            min_spacing: 120.0,
+            ..Default::default()
+        };
+        let result = layout.layout(nodes, edges);
+
+        println!("Set 4 Nodes:");
+        for node in &result.nodes {
+            println!(
+                "  {}: size {:?}, position {:?}",
+                node.id, node.size, node.position
+            );
+        }
+        println!("Set 4 Edges:");
+        for edge in &result.edges {
+            println!("  {} -> {}: {:?}", edge.source, edge.target, edge.path);
+        }
+
+        generate_svg(&result, "test_set_4.svg", true, false);
+    }
+
+    #[test]
+    fn test_layout_set_5() {
+        let nodes = vec![
+            // CAN Bus node with 8 ports
+            Node {
+                id: "CAN_Bus".to_string(),
+                size: Size {
+                    width: 200.0,
+                    height: 60.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    // Left side inputs (2 ports)
+                    Port {
+                        position: Position { x: -10.0, y: 15.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: -10.0, y: 35.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    // Right side outputs (2 ports)
+                    Port {
+                        position: Position { x: 200.0, y: 15.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 200.0, y: 35.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    // Top side inputs (2 ports)
+                    Port {
+                        position: Position { x: 45.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 145.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    // Bottom side outputs (2 ports)
+                    Port {
+                        position: Position { x: 45.0, y: 60.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 145.0, y: 60.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![("color".to_string(), "grey".to_string())],
+            },
+            // Ethernet Backbone node with 4 ports
+            Node {
+                id: "Ethernet_Backbone".to_string(),
+                size: Size {
+                    width: 180.0,
+                    height: 50.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    // Left side input
+                    Port {
+                        position: Position { x: -10.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    // Right side output
+                    Port {
+                        position: Position { x: 180.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    // Top side input
+                    Port {
+                        position: Position { x: 85.0, y: -10.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    // Bottom side output
+                    Port {
+                        position: Position { x: 85.0, y: 50.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![("color".to_string(), "grey".to_string())],
+            },
+            // Gateway ECU connected to both CAN and Ethernet
+            Node {
+                id: "Gateway_ECU".to_string(),
+                size: Size {
+                    width: 120.0,
+                    height: 80.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: -10.0, y: 50.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 120.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                    Port {
+                        position: Position { x: 120.0, y: 50.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![("color".to_string(), "violet".to_string())],
+            },
+            // Engine ECU connected to CAN
+            Node {
+                id: "Engine_ECU".to_string(),
+                size: Size {
+                    width: 100.0,
+                    height: 60.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 100.0, y: 25.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            // Transmission ECU connected to CAN
+            Node {
+                id: "Transmission_ECU".to_string(),
+                size: Size {
+                    width: 130.0,
+                    height: 70.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 130.0, y: 30.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            // Body Control ECU connected to CAN
+            Node {
+                id: "Body_ECU".to_string(),
+                size: Size {
+                    width: 110.0,
+                    height: 65.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 27.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 110.0, y: 27.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            // Telematics ECU connected to Ethernet
+            Node {
+                id: "Telematics_ECU".to_string(),
+                size: Size {
+                    width: 120.0,
+                    height: 55.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 120.0, y: 22.5 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+            // ADAS ECU connected to Ethernet
+            Node {
+                id: "ADAS_ECU".to_string(),
+                size: Size {
+                    width: 100.0,
+                    height: 50.0,
+                },
+                position: Position { x: 0.0, y: 0.0 },
+                ports: vec![
+                    Port {
+                        position: Position { x: -10.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Input,
+                    },
+                    Port {
+                        position: Position { x: 100.0, y: 20.0 },
+                        size: Size {
+                            width: 10.0,
+                            height: 10.0,
+                        },
+                        port_type: PortType::Output,
+                    },
+                ],
+                attributes: vec![],
+            },
+        ];
+
+        // Less interconnected than set 4 - focused on bus topology
+        let edges = vec![
+            // Gateway ECU connections to CAN Bus (2 connections)
+            (0, 2),
+            (2, 0),
+            // Gateway ECU connections to Ethernet Backbone (2 connections)
+            (1, 2),
+            (2, 1),
+            // CAN-connected ECUs (3 ECUs connected to CAN Bus)
+            (0, 3),
+            (3, 0), // Engine ECU
+            (0, 4),
+            (4, 0), // Transmission ECU
+            (0, 5),
+            (5, 0), // Body ECU
+            // Ethernet-connected ECUs (2 ECUs connected to Ethernet Backbone)
+            (1, 6),
+            (6, 1), // Telematics ECU
+            (1, 7),
+            (7, 1), // ADAS ECU
+        ];
+
+        let layout = CustomLayout {
+            allow_diagonals: false,
+            min_spacing: 120.0,
+            ..Default::default()
+        };
+        let result = layout.layout(nodes, edges);
+
+        println!("Set 5 Nodes:");
+        for node in &result.nodes {
+            println!(
+                "  {}: size {:?}, position {:?}",
+                node.id, node.size, node.position
+            );
+        }
+        println!("Set 5 Edges:");
+        for edge in &result.edges {
+            println!("  {} -> {}: {:?}", edge.source, edge.target, edge.path);
+        }
+
+        generate_svg(&result, "test_set_5.svg", true, true);
     }
 }
