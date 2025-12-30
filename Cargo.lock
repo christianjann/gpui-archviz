@@ -100,6 +100,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "archviz-layout"
+version = "0.1.0"
+dependencies = [
+ "petgraph 0.6.5",
+ "rand 0.8.5",
+ "serde",
+ "svg",
+]
+
+[[package]]
 name = "arg_enum_proc_macro"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3904,16 +3914,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
  "log",
-]
-
-[[package]]
-name = "layout"
-version = "0.1.0"
-dependencies = [
- "petgraph 0.6.5",
- "rand 0.8.5",
- "serde",
- "svg",
 ]
 
 [[package]]

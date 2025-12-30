@@ -37,4 +37,4 @@ watch:
     cargo watch -x 'run'
 
 layout-test:
-    cargo test -p layout -- --nocapture
+    cargo test -p archviz-layout -- --nocapture
