@@ -1,6 +1,11 @@
 [workspace]
 default-members = ["crates/viewer"]
-members = ["crates/viewer", "crates/story", "crates/graphview", "crates/layout"]
+members = [
+    "crates/viewer",
+    "crates/gpui-components",
+    "crates/graphview",
+    "crates/layout",
+]
 resolver = "2"
 
 [workspace.package]

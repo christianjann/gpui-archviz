@@ -11,7 +11,7 @@ anyhow.workspace = true
 gpui.workspace = true
 gpui-component = { workspace = true, features = ["tree-sitter-languages"] }
 gpui-component-assets.workspace = true
-gpui-component-story = { path = "../story" }
+gpui-component-story = { path = "../gpui-components" }
 reqwest_client = { path = "../reqwest_client" }
 archviz-graphview = { path = "../graphview" }
 
