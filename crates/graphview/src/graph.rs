@@ -909,8 +909,8 @@ impl Render for Graph {
 
                     // Write back
                     for i in 0..n {
-                        let nx = px(xs[i] as f32);
-                        let ny = px(ys[i] as f32);
+                        let nx = px(xs[i]);
+                        let ny = px(ys[i]);
                         let ent = nodes_for_sim[i].clone();
                         cx.update_entity(&ent, move |node, _| {
                             node.x = nx;
