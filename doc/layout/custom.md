@@ -1,6 +1,6 @@
 # Custom ArchViz Layout Algorithm
 
-This document outlines the custom graph layout algorithm implemented in the [ArchViz Layout crate](../crates/layout/README.md). For API documentation and usage examples, see the [main crate documentation](../crates/layout/README.md).
+This document outlines the custom graph layout algorithm implemented in the [ArchViz Layout crate](../../crates/layout/). For API documentation and usage examples, see the [main crate documentation](../../crates/layout/README.md).
 
 ## Current Implementation
 
@@ -14,18 +14,18 @@ The algorithm is fully implemented and consists of four phases that produce clea
 ### Phase 2: Force-Directed Refinement
 - **Repulsion Forces**: Nodes repel each other based on their bounding boxes
 - **Attraction Forces**: Connected nodes attract along their connecting edges
-- **Iterative Optimization**: 200 iterations (configurable) with cooling schedule
+- **Iterative Optimization**: 100 iterations (configurable) for convergence
 - **Configurable Parameters**:
-  - `repulsion_strength`: Default 10,000.0
+  - `repulsion_strength`: Default 1,000.0
   - `attraction_strength`: Default 0.1
-  - `min_spacing`: Default 50.0 (configurable per test set)
+  - `min_spacing`: Default 20.0 (configurable per test set)
 
 ### Phase 3: Edge Routing
 - **Port Selection**: Intelligent port assignment based on connection direction
 - **Grid-Based Pathfinding**: BFS algorithm on discrete 5.0-unit grid
 - **Orthogonal Routing**: All edges use horizontal/vertical segments only
 - **Obstacle Avoidance**: Routes avoid node interiors and existing edges
-- **Extension Points**: 25.0-unit orthogonal extensions from ports before routing
+- **Extension Points**: Dynamic orthogonal extensions from ports before routing (extends just enough to reach non-obstacle cells)
 
 ### Phase 4: Finalization
 - **Canvas Calculation**: Determines bounding box with padding
@@ -44,30 +44,32 @@ The algorithm is fully implemented and consists of four phases that produce clea
 
 ## Test Sets
 
-The implementation includes 5 comprehensive test sets demonstrating different scenarios:
+The implementation includes 6 comprehensive test sets demonstrating different scenarios:
 
 1. **Test Set 1**: Basic network topology with ports completely outside nodes
 2. **Test Set 2**: Complex structure with spaced edges option
 3. **Test Set 3**: Automotive systems with ports centered on node edges (half in/half out)
 4. **Test Set 4**: Complex automotive system with dense connectivity
 5. **Test Set 5**: ECU network with separate bus and Ethernet clusters
+6. **Test Set 6**: Large automotive network with obstacle visualization
 
 ## Performance Characteristics
 
 - **Target Scale**: Optimized for 50-200 nodes typical in architecture diagrams
 - **Algorithm Complexity**: O(n²) for force-directed phase, O(e × grid_size) for routing
 - **Grid Resolution**: 5.0-unit cells for pathfinding precision
-- **Iteration Count**: Fixed 200 iterations for predictable performance
+- **Iteration Count**: Default 100 iterations (configurable) for predictable performance
 - **Memory Usage**: Efficient data structures with minimal allocations
 
 ## Configuration Options
 
 ```rust
-CustomLayout {
-    iterations: 200,                    // Force-directed iterations
-    repulsion_strength: 10000.0,        // Node repulsion force
-    attraction_strength: 0.1,           // Edge attraction force
-    min_spacing: 50.0,                  // Minimum node spacing
+ArchVizLayout {
+    iterations: 100,                    // Force-directed iterations (default)
+    repulsion_strength: 1000.0,         // Node repulsion force (default)
+    attraction_strength: 0.1,           // Edge attraction force (default)
+    initial_spacing: 100.0,             // Initial spacing (default)
+    min_spacing: 20.0,                  // Minimum node spacing (default)
     allow_diagonals: false,             // Orthogonal routing only
     spaced_edges: false,                // Allow edge overlaps
 }

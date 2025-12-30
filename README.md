@@ -32,7 +32,7 @@ This is an experimental project to explore:
 - **[Rust](https://www.rust-lang.org/)** - Systems programming language
 - **[GPUI](https://gpui.rs/)** - GPU-accelerated UI framework from Zed
 - **[gpui-component](https://github.com/longbridge/gpui-component)** - UI component library for GPUI
-- **[archviz-layout](../crates/layout/)** - Custom force-directed graph layout with orthogonal edge routing
+- **[archviz-layout](../crates/layout/)** - Specialized layout algorithm for architecture diagrams with obstacle-aware routing
 - **[dagre-rs](https://crates.io/crates/dagre-rs)** - Hierarchical graph layout (Sugiyama method)
 - **[petgraph](https://crates.io/crates/petgraph)** - Graph data structures
 - **[KDL](https://kdl.dev/)** - Document language for model files
@@ -40,7 +40,7 @@ This is an experimental project to explore:
 ## Features
 
 - 📊 **Graph Visualization** - Interactive node-based diagrams
-- 🔄 **Multiple Layouts** - Force-directed simulation, Dagre hierarchical layout, and integrated ArchViz orthogonal layout
+- 🔄 **Multiple Layouts** - Force-directed simulation, Dagre hierarchical layout and ArchViz layout optimized for architecture diagrams
 - 🖱️ **Interactive** - Pan, zoom, drag nodes, click to select
 - 🎨 **Edge Highlighting** - Orange for outgoing edges, blue for incoming edges
 - 📦 **Nested Nodes** - ECUs contain partitions which contain software components
@@ -49,9 +49,9 @@ This is an experimental project to explore:
 
 ## Documentation
 
-- **[Layout Algorithm](../../doc/layout/custom.md)**: Detailed design document for the custom graph layout algorithm
-- **[Layout Crate](../crates/layout/README.md)**: API documentation for the layout library
-- **[GraphView Crate](../crates/graphview/README.md)**: Documentation for the GPUI graph visualization component
+- **[Layout Algorithms](doc/layout/README.md)**: Overview and documentation for all graph layout algorithms
+- **[Layout Crate](crates/layout/README.md)**: API documentation for the layout library
+- **[GraphView Crate](crates/graphview/README.md)**: Documentation for the GPUI graph visualization component
 
 ## Building
 
@@ -93,7 +93,7 @@ BodyController type="ecu" {
 ```
 ## Known issues
 - When maximizing the window the cursor stays in resize mode outside the original window area until first manual resize of the window
-- Sometimes the draping cursor is stuck at dragging, what helps is a right or middle click of the mouse
+- Sometimes the dragging cursor is stuck at dragging, what helps is a right or middle click of the mouse
 
 ## License
 

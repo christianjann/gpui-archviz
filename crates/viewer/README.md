@@ -7,7 +7,7 @@ A demo application for visualizing vehicle E/E architecture diagrams using GPUI.
 - Interactive graph visualization of architecture models
 - Bidirectional highlighting between text editor and graph view
 - Support for KDL-based model definitions
-- Multiple layout algorithms (force-directed and hierarchical)
+- Multiple layout algorithms (force-directed, basic hierarchical and ArchViz for architecture diagrams)
 - Real-time updates as you edit the model
 
 ## Building

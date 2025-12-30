@@ -390,6 +390,9 @@ impl ArchVizLayout {
         false
     }
 
+    /// Calculates the optimal extension distance from a port to the nearest non-obstacle cell.
+    /// This ensures ports extend just enough to reach clear routing space without over-extending
+    /// into forbidden areas, which would cause ugly routing artifacts.
     fn calculate_extension_distance(
         &self,
         grid: &Grid,
