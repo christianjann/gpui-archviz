@@ -24,6 +24,8 @@ pub enum LayoutMode {
     Force,
     /// Dagre hierarchical layout (Sugiyama method)
     Dagre,
+    /// Custom ArchViz layout with orthogonal edge routing
+    ArchViz,
 }
 
 pub struct Graph {
@@ -366,6 +368,63 @@ impl Graph {
 
         cx.notify();
     }
+
+    pub fn apply_archviz_layout(&mut self, cx: &mut Context<Self>) {
+        use archviz_layout::{CustomLayout, Node, Size, Position};
+
+        let n = self.nodes.len();
+        if n == 0 {
+            return;
+        }
+
+        // Convert GraphNode entities to archviz-layout Node structs
+        let mut layout_nodes: Vec<Node> = Vec::with_capacity(n);
+        for node_entity in &self.nodes {
+            let (name, width, height) = cx.read_entity(node_entity, |node, _| {
+                (node.name.clone(), node.width, node.height)
+            });
+
+            // Create basic node with default position (layout will reposition)
+            let node = Node {
+                id: name.clone(),
+                size: Size {
+                    width: width as f64,
+                    height: height as f64,
+                },
+                position: Position { x: 0.0, y: 0.0 }, // Layout will set proper positions
+                ports: vec![], // No ports for now
+                attributes: vec![],
+            };
+            layout_nodes.push(node);
+        }
+
+        // Convert GraphEdge to edge tuples
+        let layout_edges: Vec<(usize, usize)> = self.edges.iter()
+            .filter(|edge| edge.source < n && edge.target < n)
+            .map(|edge| (edge.source, edge.target))
+            .collect();
+
+        // Run the archviz layout algorithm
+        let layout = CustomLayout::default();
+        let result = layout.layout(layout_nodes, layout_edges);
+
+        // Apply the resulting positions back to GraphNode entities
+        let zoom = self.zoom;
+        let pan = self.pan;
+        for (i, node_entity) in self.nodes.iter().enumerate() {
+            if i < result.nodes.len() {
+                let node = &result.nodes[i];
+                cx.update_entity(node_entity, |graph_node, _| {
+                    graph_node.x = px(node.position.x as f32);
+                    graph_node.y = px(node.position.y as f32);
+                    graph_node.zoom = zoom;
+                    graph_node.pan = pan;
+                });
+            }
+        }
+
+        cx.notify();
+    }
 }
 
 fn parameter_button<F>(
@@ -661,6 +720,7 @@ impl Render for Graph {
             let layout_label = match layout_mode {
                 LayoutMode::Force => "Force",
                 LayoutMode::Dagre => "Dagre",
+                LayoutMode::ArchViz => "ArchViz",
             };
             let layout_button = div()
                 .px(px(8.0))
@@ -682,7 +742,13 @@ impl Render for Graph {
                                 this.playing = false; // Stop force simulation
                                 LayoutMode::Dagre
                             }
-                            LayoutMode::Dagre => LayoutMode::Force,
+                            LayoutMode::Dagre => {
+                                // Apply archviz layout immediately when switching to it
+                                this.apply_archviz_layout(cx);
+                                this.playing = false; // Stop force simulation
+                                LayoutMode::ArchViz
+                            }
+                            LayoutMode::ArchViz => LayoutMode::Force,
                         };
                         cx.notify();
                     }),
@@ -1124,8 +1190,8 @@ impl Render for Graph {
                     .justify_center()
                     .text_size(px(12.0))
                     .child(div().text_color(button_text_color).child(
-                        if self.layout_mode == LayoutMode::Dagre {
-                            "⟳" // Refresh/relayout icon for dagre
+                        if self.layout_mode == LayoutMode::Dagre || self.layout_mode == LayoutMode::ArchViz {
+                            "⟳" // Refresh/relayout icon for dagre and archviz
                         } else if self.playing {
                             "||" // Pause symbol (using ASCII for better visibility)
                         } else {
@@ -1143,6 +1209,10 @@ impl Render for Graph {
                                     LayoutMode::Dagre => {
                                         // In Dagre mode, clicking applies the layout once
                                         this.apply_dagre_layout(cx);
+                                    }
+                                    LayoutMode::ArchViz => {
+                                        // In ArchViz mode, clicking applies the layout once
+                                        this.apply_archviz_layout(cx);
                                     }
                                 }
                                 cx.notify();

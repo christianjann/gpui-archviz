@@ -2800,6 +2800,7 @@ name = "gpui-archviz"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "archviz-layout",
  "autocorrect",
  "chrono",
  "color-lsp",
@@ -3109,6 +3110,7 @@ dependencies = [
 name = "graphview"
 version = "0.1.0"
 dependencies = [
+ "archviz-layout",
  "dagre-rs",
  "gpui",
  "gpui-component",

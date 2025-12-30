@@ -16,6 +16,7 @@ gpui-component-assets.workspace = true
 gpui-component-story = { path = "../story" }
 reqwest_client = { path = "../reqwest_client" }
 graphview = { path = "../graphview" }
+archviz-layout = { path = "../layout" }
 
 autocorrect = "2.14.2"
 chrono = "0.4"

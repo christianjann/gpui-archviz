@@ -21,6 +21,7 @@ dagre-rs.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
 petgraph = "0.8.3"
+archviz-layout = { path = "../layout" }
 
 [[example]]
 name = "kitchen_sink"

@@ -40,7 +40,7 @@ This is an experimental project to explore:
 ## Features
 
 - 📊 **Graph Visualization** - Interactive node-based diagrams
-- 🔄 **Multiple Layouts** - Force-directed simulation, Dagre hierarchical layout, and custom orthogonal layout algorithm
+- 🔄 **Multiple Layouts** - Force-directed simulation, Dagre hierarchical layout, and integrated ArchViz orthogonal layout
 - 🖱️ **Interactive** - Pan, zoom, drag nodes, click to select
 - 🎨 **Edge Highlighting** - Orange for outgoing edges, blue for incoming edges
 - 📦 **Nested Nodes** - ECUs contain partitions which contain software components
@@ -73,8 +73,8 @@ cargo run
    - **Zoom**: `+`/`-` buttons or mouse wheel
    - **Pan**: Middle mouse button drag or scroll
    - **Fit**: Click "Fit" to fit all nodes in view
-   - **Layout**: Toggle between "Force" (physics simulation), "Dagre" (hierarchical) layout and custom layout modes
-   - **Play/Refresh**: In Force mode, toggles simulation; in Dagre mode, re-applies layout
+   - **Layout**: Toggle between "Force" (physics simulation), "Dagre" (hierarchical), and "ArchViz" (orthogonal) layout modes
+   - **Play/Refresh**: In Force mode, toggles simulation; in Dagre/ArchViz modes, re-applies layout
 
 ## Model Format (KDL)
 
@@ -94,7 +94,6 @@ BodyController type="ecu" {
 ## Known issues
 - When maximizing the window the cursor stays in resize mode outside the original window area until first manual resize of the window
 - Sometimes the draping cursor is stuck at dragging, what helps is a right or middle click of the mouse
-
 
 ## License
 
