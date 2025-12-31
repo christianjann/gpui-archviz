@@ -6,11 +6,9 @@ A GPUI-based graph visualization library for interactive node-edge diagrams.
 
 This crate is based on [gpug](https://github.com/jerlendds/gpug) by [@jerlendds](https://github.com/jerlendds).
 
-Based on commit [`ed5af44`](https://github.com/jerlendds/gpug/commit/ed5af446a091e3c0e19bebbcc4696f13e0b24cf0) (2025-10-16).
+Based on commit [`0f8ebd2`](https://github.com/jerlendds/gpug/commit/0f8ebd29d5d97f0d9bb1126bd71a92dd6bef50b9) (2025-12-31).
 
 Thank you to jerlendds for the original implementation!
-
-**License Status:** The license for the original gpug repository is currently unknown. If the upstream license is clarified, this will be updated accordingly or the code will be removed.
 
 ## Features
 

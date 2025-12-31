@@ -1,6 +1,7 @@
 [package]
 name = "archviz-graphview"
 version.workspace = true
+license.workspace = true
 authors = [
     "jerlendds <oss@osintbuddy.com>",
     "Christian Jann <christian.jann@ymail.com>",
