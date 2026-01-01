@@ -61,6 +61,34 @@ pub struct Node {
     pub attributes: Vec<(String, String)>, // optional key-value attributes
 }
 
+impl Node {
+    /// Returns the effective bounding box including ports, as (min_x, max_x, min_y, max_y) relative to node position
+    pub fn effective_bounds(&self) -> (f64, f64, f64, f64) {
+        let mut min_x = 0.0;
+        let mut max_x = self.size.width;
+        let mut min_y = 0.0;
+        let mut max_y = self.size.height;
+
+        for port in &self.ports {
+            min_x = f64::min(min_x, port.position.x);
+            max_x = f64::max(max_x, port.position.x + port.size.width);
+            min_y = f64::min(min_y, port.position.y);
+            max_y = f64::max(max_y, port.position.y + port.size.height);
+        }
+
+        (min_x, max_x, min_y, max_y)
+    }
+
+    /// Returns the effective size including ports
+    pub fn effective_size(&self) -> Size {
+        let (min_x, max_x, min_y, max_y) = self.effective_bounds();
+        Size {
+            width: max_x - min_x,
+            height: max_y - min_y,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Edge {
     pub source: usize,

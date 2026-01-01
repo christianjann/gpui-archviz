@@ -48,14 +48,43 @@ impl ArchVizLayout {
     ) -> LayoutResult {
         let mut nodes = nodes;
 
+        // Precompute effective bounds and sizes for performance
+        let effective_bounds: Vec<(f64, f64, f64, f64)> =
+            nodes.iter().map(|n| n.effective_bounds()).collect();
+        let effective_sizes: Vec<Size> = effective_bounds
+            .iter()
+            .map(|&(min_x, max_x, min_y, max_y)| Size {
+                width: max_x - min_x,
+                height: max_y - min_y,
+            })
+            .collect();
+
+        // Dynamically adjust min_spacing based on node sizes to ensure routing space
+        let routing_clearance = 15.0; // Minimum space needed between effective bounding boxes for routing
+
+        let adjusted_min_spacing = f64::max(routing_clearance, self.min_spacing);
+
+        // Create a modified config with adjusted spacing
+        let config = ArchVizLayout {
+            min_spacing: adjusted_min_spacing,
+            ..*self
+        };
+
         // Phase 1: Initial placement
-        self.initial_placement(&mut nodes, &edges);
+        config.initial_placement(&mut nodes, &edges);
 
         // Phase 2a: Force-directed refinement with initial spacing (no overlap prevention)
-        self.force_directed_with_spacing(&mut nodes, &edges, self.initial_spacing, false);
+        config.force_directed_with_spacing(
+            &mut nodes,
+            &edges,
+            config.initial_spacing,
+            false,
+            &effective_sizes,
+            &effective_bounds,
+        );
 
         // Check for overlaps after initial refinement
-        let has_overlaps = self.has_overlaps(&nodes);
+        let has_overlaps = config.has_overlaps(&nodes, &effective_bounds);
 
         if enabled!(Level::DEBUG) {
             if has_overlaps {
@@ -69,19 +98,26 @@ impl ArchVizLayout {
 
         // Phase 2b: If overlaps exist, run force-directed refinement with min spacing and overlap prevention
         if has_overlaps {
-            self.force_directed_with_spacing(&mut nodes, &edges, self.min_spacing, true);
+            config.force_directed_with_spacing(
+                &mut nodes,
+                &edges,
+                config.min_spacing,
+                true,
+                &effective_sizes,
+                &effective_bounds,
+            );
         }
 
         if enabled!(Level::DEBUG) {
-            self.detect_overlaps(&nodes);
+            config.detect_overlaps(&nodes, &effective_bounds, &effective_sizes);
         }
 
         // Phase 3: Edge routing
-        let (mut routed_edges, mut grid) = self.route_edges(&mut nodes, &edges);
+        let (mut routed_edges, mut grid) = config.route_edges(&mut nodes, &edges);
 
         // Phase 4: Calculate canvas and center layout
-        let (canvas_width, canvas_height) = self.calculate_canvas_size(&nodes, &routed_edges);
-        self.center_layout(
+        let (canvas_width, canvas_height) = config.calculate_canvas_size(&nodes, &routed_edges);
+        config.center_layout(
             &mut nodes,
             &mut routed_edges,
             canvas_width,
@@ -236,6 +272,8 @@ impl ArchVizLayout {
         edges: &[(usize, usize, Option<usize>, Option<usize>)],
         spacing: f64,
         prevent_overlaps: bool,
+        effective_sizes: &[Size],
+        effective_bounds: &[(f64, f64, f64, f64)],
     ) {
         for _ in 0..self.iterations {
             let mut forces: Vec<Position> = vec![Position { x: 0.0, y: 0.0 }; nodes.len()];
@@ -243,13 +281,15 @@ impl ArchVizLayout {
             // Calculate repulsion
             for i in 0..nodes.len() {
                 for j in (i + 1)..nodes.len() {
-                    let dx = (nodes[j].position.x + nodes[j].size.width / 2.0)
-                        - (nodes[i].position.x + nodes[i].size.width / 2.0);
-                    let dy = (nodes[j].position.y + nodes[j].size.height / 2.0)
-                        - (nodes[i].position.y + nodes[i].size.height / 2.0);
-                    let min_dist =
-                        (nodes[i].size.width / 2.0 + nodes[j].size.width / 2.0 + spacing)
-                            .max(nodes[i].size.height / 2.0 + nodes[j].size.height / 2.0 + spacing);
+                    let dx = (nodes[j].position.x + effective_sizes[j].width / 2.0)
+                        - (nodes[i].position.x + effective_sizes[i].width / 2.0);
+                    let dy = (nodes[j].position.y + effective_sizes[j].height / 2.0)
+                        - (nodes[i].position.y + effective_sizes[i].height / 2.0);
+                    let min_dist = ((effective_sizes[i].width + effective_sizes[j].width) / 2.0
+                        + spacing)
+                        .max(
+                            (effective_sizes[i].height + effective_sizes[j].height) / 2.0 + spacing,
+                        );
                     let dist = (dx * dx + dy * dy).sqrt();
                     if dist < min_dist {
                         let force = self.repulsion_strength * (min_dist - dist) / min_dist;
@@ -293,13 +333,20 @@ impl ArchVizLayout {
                             continue;
                         }
 
-                        let other_x = nodes[j].position.x;
-                        let other_y = nodes[j].position.y;
+                        let (min_x_i, max_x_i, min_y_i, max_y_i) = effective_bounds[i];
+                        let left_i = new_x + min_x_i;
+                        let right_i = new_x + max_x_i;
+                        let top_i = new_y + min_y_i;
+                        let bottom_i = new_y + max_y_i;
 
-                        let overlap_x = new_x < other_x + nodes[j].size.width
-                            && new_x + nodes[i].size.width > other_x;
-                        let overlap_y = new_y < other_y + nodes[j].size.height
-                            && new_y + nodes[i].size.height > other_y;
+                        let (min_x_j, max_x_j, min_y_j, max_y_j) = effective_bounds[j];
+                        let left_j = nodes[j].position.x + min_x_j;
+                        let right_j = nodes[j].position.x + max_x_j;
+                        let top_j = nodes[j].position.y + min_y_j;
+                        let bottom_j = nodes[j].position.y + max_y_j;
+
+                        let overlap_x = left_i < right_j && right_i > left_j;
+                        let overlap_y = top_i < bottom_j && bottom_i > top_j;
 
                         if overlap_x && overlap_y {
                             can_move = false;
@@ -321,7 +368,12 @@ impl ArchVizLayout {
         }
     }
 
-    fn detect_overlaps(&self, nodes: &[Node]) {
+    fn detect_overlaps(
+        &self,
+        nodes: &[Node],
+        effective_bounds: &[(f64, f64, f64, f64)],
+        effective_sizes: &[Size],
+    ) {
         let mut overlaps = Vec::new();
 
         for i in 0..nodes.len() {
@@ -329,11 +381,21 @@ impl ArchVizLayout {
                 let node1 = &nodes[i];
                 let node2 = &nodes[j];
 
-                // Check if bounding boxes overlap
-                let overlap_x = node1.position.x < node2.position.x + node2.size.width
-                    && node1.position.x + node1.size.width > node2.position.x;
-                let overlap_y = node1.position.y < node2.position.y + node2.size.height
-                    && node1.position.y + node1.size.height > node2.position.y;
+                // Check if effective bounding boxes overlap
+                let (min_x1, max_x1, min_y1, max_y1) = effective_bounds[i];
+                let left1 = node1.position.x + min_x1;
+                let right1 = node1.position.x + max_x1;
+                let top1 = node1.position.y + min_y1;
+                let bottom1 = node1.position.y + max_y1;
+
+                let (min_x2, max_x2, min_y2, max_y2) = effective_bounds[j];
+                let left2 = node2.position.x + min_x2;
+                let right2 = node2.position.x + max_x2;
+                let top2 = node2.position.y + min_y2;
+                let bottom2 = node2.position.y + max_y2;
+
+                let overlap_x = left1 < right2 && right1 > left2;
+                let overlap_y = top1 < bottom2 && bottom1 > top2;
 
                 if overlap_x && overlap_y {
                     overlaps.push((i, j, node1.id.clone(), node2.id.clone()));
@@ -351,17 +413,17 @@ impl ArchVizLayout {
                     let node1 = &nodes[i];
                     let node2 = &nodes[j];
                     debug!(
-                        "  {} ({:.1},{:.1} size {:.1}x{:.1}) overlaps with {} ({:.1},{:.1} size {:.1}x{:.1})",
+                        "  {} ({:.1},{:.1} effective size {:.1}x{:.1}) overlaps with {} ({:.1},{:.1} effective size {:.1}x{:.1})",
                         id1,
                         node1.position.x,
                         node1.position.y,
-                        node1.size.width,
-                        node1.size.height,
+                        effective_sizes[i].width,
+                        effective_sizes[i].height,
                         id2,
                         node2.position.x,
                         node2.position.y,
-                        node2.size.width,
-                        node2.size.height
+                        effective_sizes[j].width,
+                        effective_sizes[j].height
                     );
                 }
             } else {
@@ -370,17 +432,27 @@ impl ArchVizLayout {
         }
     }
 
-    fn has_overlaps(&self, nodes: &[Node]) -> bool {
+    fn has_overlaps(&self, nodes: &[Node], effective_bounds: &[(f64, f64, f64, f64)]) -> bool {
         for i in 0..nodes.len() {
             for j in (i + 1)..nodes.len() {
                 let node1 = &nodes[i];
                 let node2 = &nodes[j];
 
-                // Check if bounding boxes overlap
-                let overlap_x = node1.position.x < node2.position.x + node2.size.width
-                    && node1.position.x + node1.size.width > node2.position.x;
-                let overlap_y = node1.position.y < node2.position.y + node2.size.height
-                    && node1.position.y + node1.size.height > node2.position.y;
+                // Check if effective bounding boxes overlap
+                let (min_x1, max_x1, min_y1, max_y1) = effective_bounds[i];
+                let left1 = node1.position.x + min_x1;
+                let right1 = node1.position.x + max_x1;
+                let top1 = node1.position.y + min_y1;
+                let bottom1 = node1.position.y + max_y1;
+
+                let (min_x2, max_x2, min_y2, max_y2) = effective_bounds[j];
+                let left2 = node2.position.x + min_x2;
+                let right2 = node2.position.x + max_x2;
+                let top2 = node2.position.y + min_y2;
+                let bottom2 = node2.position.y + max_y2;
+
+                let overlap_x = left1 < right2 && right1 > left2;
+                let overlap_y = top1 < bottom2 && bottom1 > top2;
 
                 if overlap_x && overlap_y {
                     return true;
@@ -1057,7 +1129,24 @@ mod tests {
             ..Default::default()
         };
 
-        layout.force_directed_with_spacing(&mut nodes, &edges, layout.min_spacing, true);
+        let effective_bounds: Vec<(f64, f64, f64, f64)> =
+            nodes.iter().map(|n| n.effective_bounds()).collect();
+        let effective_sizes: Vec<Size> = effective_bounds
+            .iter()
+            .map(|&(min_x, max_x, min_y, max_y)| Size {
+                width: max_x - min_x,
+                height: max_y - min_y,
+            })
+            .collect();
+
+        layout.force_directed_with_spacing(
+            &mut nodes,
+            &edges,
+            layout.min_spacing,
+            true,
+            &effective_sizes,
+            &effective_bounds,
+        );
 
         // Nodes should have moved apart
         let dist = ((nodes[1].position.x - nodes[0].position.x).powi(2)
