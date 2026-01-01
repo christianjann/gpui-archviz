@@ -122,3 +122,15 @@ When nodes have defined ports:
 - **Obstacle Mapping**: Node bodies and port areas are marked as obstacles
 - **Path Reconstruction**: A* paths are converted back to continuous coordinates
 - **Boundary Handling**: Grid automatically expands to cover all nodes with padding
+
+## Performance & Architecture Improvements
+
+For detailed information about proposed performance optimizations and architectural enhancements, see the [Improvements Document](doc/improvements.md).
+
+This document outlines:
+- **Performance improvements** targeting 5-10x speedups for large graphs
+- **Architectural enhancements** for better modularity and extensibility
+- **Implementation roadmap** with prioritized development phases
+- **Benchmarking strategies** for measuring improvements
+
+Key areas include spatial partitioning for O(n²) → O(n log n) force calculations, parallel processing, incremental layout updates, and modular algorithm components.
