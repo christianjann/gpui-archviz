@@ -454,25 +454,29 @@ impl Graph {
 
             // Define ports: left (input) and right (output)
             let header_height = 28.0f64;
-            let port_y = header_height / 2.0;
+            let port_size = 10.0f64;
+            let port_y = (header_height - port_size) / 2.0; // Center port vertically in header
             let ports = vec![
                 Port {
-                    position: Position { x: 0.0, y: port_y }, // Left port
+                    position: Position {
+                        x: -port_size / 2.0,
+                        y: port_y,
+                    }, // Left port centered on edge
                     size: Size {
-                        width: 10.0,
-                        height: 10.0,
+                        width: port_size,
+                        height: port_size,
                     },
                     port_type: PortType::Input,
                     id: None,
                 },
                 Port {
                     position: Position {
-                        x: width as f64,
+                        x: width as f64 - port_size / 2.0,
                         y: port_y,
-                    }, // Right port
+                    }, // Right port centered on edge
                     size: Size {
-                        width: 10.0,
-                        height: 10.0,
+                        width: port_size,
+                        height: port_size,
                     },
                     port_type: PortType::Output,
                     id: None,
@@ -545,25 +549,29 @@ impl Graph {
 
             // Define ports: left (input) and right (output)
             let header_height = 28.0f64;
-            let port_y = header_height / 2.0;
+            let port_size = 10.0f64;
+            let port_y = (header_height - port_size) / 2.0; // Center port vertically in header
             let ports = vec![
                 Port {
-                    position: Position { x: 0.0, y: port_y }, // Left port
+                    position: Position {
+                        x: -port_size / 2.0,
+                        y: port_y,
+                    }, // Left port centered on edge
                     size: Size {
-                        width: 10.0,
-                        height: 10.0,
+                        width: port_size,
+                        height: port_size,
                     },
                     port_type: PortType::Input,
                     id: None,
                 },
                 Port {
                     position: Position {
-                        x: width as f64,
+                        x: width as f64 - port_size / 2.0,
                         y: port_y,
-                    }, // Right port
+                    }, // Right port centered on edge
                     size: Size {
-                        width: 10.0,
-                        height: 10.0,
+                        width: port_size,
+                        height: port_size,
                     },
                     port_type: PortType::Output,
                     id: None,
