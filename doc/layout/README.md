@@ -55,5 +55,5 @@ Eclipse Layout Kernel - a comprehensive layout framework with multiple algorithm
 ## Navigation
 
 - [Main Project README](../../README.md) - Project overview and features
-- [Layout Crate Documentation](../../crates/layout/README.md) - API reference
+- [Layout Crate Documentation](https://github.com/christianjann/arcivis-layout) - API reference
 - [GraphView Crate Documentation](../../crates/graphview/README.md) - Integration guide
